@@ -129,17 +129,16 @@ curl -X GET "https://terminal-api.dackieswap.xyz/api/wallet/balance" \
 **Output format:**
 ```
 Cap Wallet Balance
-━━━━━━━━━━━━━━━━━━━━━
+
 Address: 0xBff8...e96f
 Total Balance: $2,040.25 USD
 
 Token Holdings:
-┌─────────────┬────────────────────────────────────────────┬──────────────┬────────────┐
-│ Token       │ Address                                    │ Amount       │ USD Value  │
-├─────────────┼────────────────────────────────────────────┼──────────────┼────────────┤
-│ ETH         │ native                                     │ 0.088        │ $200.58    │
-│ VIRTUAL     │ 0x0b3e328455c4059eeb9e3f84b5543f74e24e7e1b │ 1,532.27     │ $993.06    │
-└─────────────┴────────────────────────────────────────────┴──────────────┴────────────┘
+
+| Token   | Address                                    | Amount    | USD Value |
+|---------|--------------------------------------------|-----------|-----------|
+| ETH     | native                                     | 0.088     | $200.58   |
+| VIRTUAL | 0x0b3e328455c4059eeb9e3f84b5543f74e24e7e1b | 1,532.27  | $993.06   |
 ```
 
 **Key fields to display:**
