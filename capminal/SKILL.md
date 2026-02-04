@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet and deploy Clanker tokens
-version: 0.3.0
+version: 0.4.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap]
 ---
@@ -171,34 +171,39 @@ Deploy a new Clanker V4 token on Base chain.
 
 **Request:**
 ```bash
-curl -X POST "https://terminal-api.dackieswap.xyz/api/gems" \
+curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/createGem" \
   -H "x-cap-api-key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My Token",
-    "symbol": "MTK"
+    "symbol": "MTK",
+    "fee": "1",
+    "marketCap": "10E",
+    "initialBuyAmount": "0"
   }'
 ```
 
-**Required Parameters:**
+**Required Parameters (all must be sent to API):**
+| Parameter | Type | Default (if user doesn't specify) | Description |
+|-----------|------|-----------------------------------|-------------|
+| name | string | - | Token name |
+| symbol | string | - | Token symbol (ticker) |
+| fee | string | "1" | Pool fee percentage |
+| marketCap | string | "10E" | Market cap tier: "10E" or "20E" |
+| initialBuyAmount | string | "0" | Initial ETH amount to buy |
+
+**Note:** User only needs to provide `name` and `symbol`. If user doesn't specify `fee`, `marketCap`, or `initialBuyAmount`, use the default values above.
+
+**Optional Parameters:**
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| name | string | Token name |
-| symbol | string | Token symbol (ticker) |
-
-**Optional Parameters (with defaults):**
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| marketCap | string | "10E" | Market cap tier: "10E" or "20E" |
-| fee | string | "1" | Pool fee percentage |
-| initialBuyAmount | string | "0" | Initial ETH amount to buy |
-| description | string | - | Token description |
-| imageUrl | string | - | Token logo URL |
-| secondsToDecay | number | - | Decay time in seconds |
-| telegramLink | string | - | Telegram group link |
-| twitterLink | string | - | Twitter/X link |
-| farcasterLink | string | - | Farcaster link |
-| websiteLink | string | - | Website URL |
+| description | string | Token description |
+| imageUrl | string | Token logo URL |
+| secondsToDecay | number | Decay time in seconds |
+| telegramLink | string | Telegram group link |
+| twitterLink | string | Twitter/X link |
+| farcasterLink | string | Farcaster link |
+| websiteLink | string | Website URL |
 
 **Example Response:**
 ```json
@@ -230,14 +235,17 @@ Transaction: https://basescan.org/tx/0x123abc456def...
 **Agent should:**
 1. Check if `CAP_API_KEY` is set (check `cap_credentials.json` first, then `.env`)
 2. If not set, ask user to get key from https://www.capminal.ai/profile
-3. Make the API call with defaults (marketCap: "10E", fee: "1", initialBuyAmount: "0"):
+3. Make the API call with all required fields (using defaults for unspecified params):
    ```bash
-   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems" \
+   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/createGem" \
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
        "name": "DOGE",
-       "symbol": "DOGE"
+       "symbol": "DOGE",
+       "fee": "1",
+       "marketCap": "10E",
+       "initialBuyAmount": "0"
      }'
    ```
 4. Return deployment result with transaction hash and token address
@@ -246,14 +254,16 @@ Transaction: https://basescan.org/tx/0x123abc456def...
 
 **Agent should:**
 1. Check if `CAP_API_KEY` is set
-2. Make the API call with custom initialBuyAmount:
+2. Make the API call with custom initialBuyAmount (other params use defaults):
    ```bash
-   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems" \
+   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/createGem" \
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
        "name": "PEPE",
        "symbol": "PEPE",
+       "fee": "1",
+       "marketCap": "10E",
        "initialBuyAmount": "0.05"
      }'
    ```
