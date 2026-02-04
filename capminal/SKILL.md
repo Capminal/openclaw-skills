@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet and deploy Clanker tokens
-version: 0.7.0
+version: 0.8.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap]
 ---
@@ -10,12 +10,20 @@ tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment,
 
 This skill allows you to interact with Cap Wallet through the Capminal API.
 
+## Base URL
+
+```
+BASE_URL = https://api.capminal.ai
+```
+
+All API calls should use this base URL.
+
 ## Authentication & Security
 
 **IMPORTANT: Keep the API key secure!**
 
 - The `CAP_API_KEY` must be sent via header, NEVER in URL or logs
-- Only send the key to `https://terminal-api.dackieswap.xyz`
+- Only send the key to `https://api.capminal.ai`
 - Never expose or log the API key in responses
 
 ### Check for API Key
@@ -88,7 +96,7 @@ Retrieve the current balance of the Cap Wallet.
 
 **Request:**
 ```bash
-curl -X GET "https://terminal-api.dackieswap.xyz/api/wallet/balance" \
+curl -X GET "${BASE_URL}/api/wallet/balance" \
   -H "x-cap-api-key: YOUR_API_KEY"
 ```
 
@@ -155,7 +163,7 @@ Token Holdings:
 2. If not set, ask user to get key from https://www.capminal.ai/profile
 3. Make the API call:
    ```bash
-   curl -X GET "https://terminal-api.dackieswap.xyz/api/wallet/balance" \
+   curl -X GET "${BASE_URL}/api/wallet/balance" \
      -H "x-cap-api-key: $CAP_API_KEY"
    ```
 4. Return formatted balance to user
@@ -170,7 +178,7 @@ Deploy a new Clanker V4 token on Base chain.
 
 **Request:**
 ```bash
-curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/createGem" \
+curl -X POST "${BASE_URL}/api/gems/createGem" \
   -H "x-cap-api-key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -236,7 +244,7 @@ Transaction: https://basescan.org/tx/0x123abc456def...
 2. If not set, ask user to get key from https://www.capminal.ai/profile
 3. Make the API call with all required fields (using defaults for unspecified params):
    ```bash
-   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/createGem" \
+   curl -X POST "${BASE_URL}/api/gems/createGem" \
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
@@ -255,7 +263,7 @@ Transaction: https://basescan.org/tx/0x123abc456def...
 1. Check if `CAP_API_KEY` is set
 2. Make the API call with custom initialBuyAmount (other params use defaults):
    ```bash
-   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/createGem" \
+   curl -X POST "${BASE_URL}/api/gems/createGem" \
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
@@ -278,7 +286,7 @@ Swap tokens using Cap Wallet on Base chain.
 
 **Request:**
 ```bash
-curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/trade" \
+curl -X POST "${BASE_URL}/api/gems/trade" \
   -H "x-cap-api-key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -310,7 +318,7 @@ When user inputs token symbol instead of address, use these addresses:
 
 **Example with percentage:**
 ```bash
-curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/trade" \
+curl -X POST "${BASE_URL}/api/gems/trade" \
   -H "x-cap-api-key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -353,7 +361,7 @@ Transaction: https://basescan.org/tx/0xdef789abc123...
 1. Check if `CAP_API_KEY` is set
 2. Make the trade API call:
    ```bash
-   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/trade" \
+   curl -X POST "${BASE_URL}/api/gems/trade" \
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
@@ -373,7 +381,7 @@ Transaction: https://basescan.org/tx/0xdef789abc123...
 2. Ask user for the token address of MTK if not provided
 3. Make the trade API call:
    ```bash
-   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/trade" \
+   curl -X POST "${BASE_URL}/api/gems/trade" \
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
@@ -392,7 +400,7 @@ Transaction: https://basescan.org/tx/0xdef789abc123...
 1. Check if `CAP_API_KEY` is set
 2. Make the trade API call:
    ```bash
-   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/trade" \
+   curl -X POST "${BASE_URL}/api/gems/trade" \
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
@@ -413,7 +421,7 @@ Transfer tokens to another wallet address on Base chain.
 
 **Request:**
 ```bash
-curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/transfer" \
+curl -X POST "${BASE_URL}/api/gems/transfer" \
   -H "x-cap-api-key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -472,7 +480,7 @@ Transaction: https://basescan.org/tx/0xabc123def456...
 2. If not set, ask user to get key from https://www.capminal.ai/profile
 3. Make the API call:
    ```bash
-   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/transfer" \
+   curl -X POST "${BASE_URL}/api/gems/transfer" \
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
@@ -491,7 +499,7 @@ Transaction: https://basescan.org/tx/0xabc123def456...
 1. Check if `CAP_API_KEY` is set
 2. Make the API call with USDC token address:
    ```bash
-   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/transfer" \
+   curl -X POST "${BASE_URL}/api/gems/transfer" \
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
