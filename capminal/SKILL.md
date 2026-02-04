@@ -90,18 +90,18 @@ Address: 0xBff8...e96f
 Total Balance: $2,040.25 USD
 
 Token Holdings:
-┌─────────────┬──────────────┬────────────┐
-│ Token       │ Amount       │ USD Value  │
-├─────────────┼──────────────┼────────────┤
-│ ETH         │ 0.088        │ $200.58    │
-│ VIRTUAL     │ 1,532.27     │ $993.06    │
-└─────────────┴──────────────┴────────────┘
+┌─────────────┬────────────────┬──────────────┬────────────┐
+│ Token       │ Address        │ Amount       │ USD Value  │
+├─────────────┼────────────────┼──────────────┼────────────┤
+│ ETH         │ native         │ 0.088        │ $200.58    │
+│ VIRTUAL     │ 0x0b3e...aaf4  │ 1,532.27     │ $993.06    │
+└─────────────┴────────────────┴──────────────┴────────────┘
 ```
 
 **Key fields to display:**
 - `data.address` - Wallet address (truncate middle)
 - `data.balance` - Total USD value
-- For each token: `symbol`, `balance_formatted`, `usd_value`
+- For each token: `symbol`, `token_address`, `balance_formatted`, `usd_value`
 
 ### Example Interaction
 
