@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet and deploy Clanker tokens
-version: 0.4.0
+version: 0.5.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap]
 ---
@@ -292,10 +292,21 @@ curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/trade" \
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| sellToken | string | Yes | Token address to sell (use `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE` for ETH) |
+| sellToken | string | Yes | Token address to sell |
 | buyToken | string | Yes | Token address to buy |
 | sellAmount | string | Yes | Amount to sell - can be absolute (e.g., "0.01") or percentage of balance (e.g., "50%") |
 | slippage | string | No | Slippage in basis points (default: 1500 = 15%) |
+
+**Common Token Addresses (Base chain):**
+
+When user inputs token symbol instead of address, use these addresses:
+
+| Symbol | Address |
+|--------|---------|
+| ETH | `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE` |
+| USDC | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` |
+
+**IMPORTANT:** Always convert token symbols to their contract addresses before making the API call.
 
 **Example with percentage:**
 ```bash
