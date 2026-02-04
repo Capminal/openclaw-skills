@@ -25,6 +25,10 @@ Before making any request, check if `CAP_API_KEY` environment variable is set.
 **If the key is NOT set**, ask the user:
 > "Your CAP_API_KEY is not configured. Please go to https://www.capminal.ai/profile, find the 'API Key' section, generate a new key, and provide it to me."
 
+## Important: Wait for API Response
+
+**IMPORTANT:** After making an API call, always wait for the complete response before answering the user. Some operations (like deploying tokens or executing trades) may take longer to process. Do NOT respond until you have received the full API response.
+
 ## Error Handling
 
 | Error | Action |
