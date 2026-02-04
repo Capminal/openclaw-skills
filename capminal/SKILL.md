@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet and deploy Clanker tokens
-version: 0.6.0
+version: 0.7.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap]
 ---
@@ -402,3 +402,102 @@ Transaction: https://basescan.org/tx/0xdef789abc123...
      }'
    ```
 3. Return the swap result with transaction link
+
+---
+
+## 4. Transfer
+
+Transfer tokens to another wallet address on Base chain.
+
+**Trigger keywords:** transfer, send, send token, transfer token
+
+**Request:**
+```bash
+curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/transfer" \
+  -H "x-cap-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": "0.01",
+    "toAddress": "0x1234567890abcdef1234567890abcdef12345678",
+    "tokenAddress": "0x0000000000000000000000000000000000000000"
+  }'
+```
+
+**Required Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| amount | string | Amount to transfer |
+| toAddress | string | Recipient wallet address |
+| tokenAddress | string | Token address to transfer |
+
+**Common Token Addresses (Base chain):**
+
+| Symbol | Address |
+|--------|---------|
+| ETH | `0x0000000000000000000000000000000000000000` |
+| USDC | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` |
+
+**IMPORTANT:** Always convert token symbols to their contract addresses before making the API call.
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "message": "Transfer completed successfully",
+  "data": {
+    "transactionHash": "0xabc123def456...",
+    "inputSymbol": "ETH",
+    "inputAmount": "0.01",
+    "inputAmountUsd": "25.50",
+    "toAddress": "0x1234567890abcdef1234567890abcdef12345678"
+  }
+}
+```
+
+**Output format:**
+```
+Transfer Completed Successfully!
+
+Sent: 0.01 ETH (~$25.50 USD)
+To: 0x1234...5678
+Transaction: https://basescan.org/tx/0xabc123def456...
+```
+
+### Example Interactions
+
+**User:** "Send 0.05 ETH to 0x1234567890abcdef1234567890abcdef12345678"
+
+**Agent should:**
+1. Check if `CAP_API_KEY` is set (check `cap_credentials.json` first, then `.env`)
+2. If not set, ask user to get key from https://www.capminal.ai/profile
+3. Make the API call:
+   ```bash
+   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/transfer" \
+     -H "x-cap-api-key: $CAP_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "amount": "0.05",
+       "toAddress": "0x1234567890abcdef1234567890abcdef12345678",
+       "tokenAddress": "0x0000000000000000000000000000000000000000"
+     }'
+   ```
+4. Return transfer result with transaction link
+
+---
+
+**User:** "Transfer 100 USDC to 0xabcdef..."
+
+**Agent should:**
+1. Check if `CAP_API_KEY` is set
+2. Make the API call with USDC token address:
+   ```bash
+   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/transfer" \
+     -H "x-cap-api-key: $CAP_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "amount": "100",
+       "toAddress": "0xabcdef...",
+       "tokenAddress": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+     }'
+   ```
+3. Return transfer result
