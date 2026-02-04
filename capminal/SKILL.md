@@ -20,10 +20,50 @@ This skill allows you to interact with Cap Wallet through the Capminal API.
 
 ### Check for API Key
 
-Before making any request, check if `CAP_API_KEY` environment variable is set.
+Before making any request, check for `CAP_API_KEY` in this order:
 
-**If the key is NOT set**, ask the user:
+1. **First**, check if `cap_credentials.json` exists and contains a valid API key
+2. **Then**, check the `CAP_API_KEY` environment variable
+
+**To read from credentials file:**
+```bash
+cat cap_credentials.json
+```
+
+**Expected format of `cap_credentials.json`:**
+```json
+{
+  "CAP_API_KEY": "your-api-key-here"
+}
+```
+
+**If the key is NOT found**, ask the user:
 > "Your CAP_API_KEY is not configured. Please go to https://www.capminal.ai/profile, find the 'API Key' section, generate a new key, and provide it to me."
+
+### Save API Key
+
+When user provides an API key, save it to `cap_credentials.json`:
+
+```bash
+echo '{"CAP_API_KEY": "USER_PROVIDED_KEY"}' > cap_credentials.json
+```
+
+Then confirm to user:
+> "Your API key has been saved securely to cap_credentials.json."
+
+### Revoke API Key
+
+**Trigger keywords:** revoke api key, remove api key, delete credentials, logout capminal
+
+When user wants to revoke or remove their API key:
+
+1. Delete the credentials file:
+   ```bash
+   rm -f cap_credentials.json
+   ```
+
+2. Confirm to user:
+   > "Your CAP_API_KEY has been revoked and the credentials file has been removed."
 
 ## Important: Wait for API Response
 
