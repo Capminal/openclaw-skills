@@ -5,27 +5,26 @@ A community-driven collection of skills for [OpenClaw](https://openclaw.ai) agen
 ## What are Skills?
 
 Skills are modular abilities that teach OpenClaw agents new capabilities. Each skill contains:
-- `SKILL.md` - Tool definition and usage instructions
+- `SKILL.md` - Instructions and API documentation for agents
 - `_meta.json` - Skill metadata
-- `scripts/` - Executable scripts (Python, JS, etc.)
 
 ## Available Skills
 
 | Skill | Description | Author |
 |-------|-------------|--------|
-| [capminal-skill](./capminal-skill) | Interact with Cap Wallet via Capminal API | AndreaPN |
+| [capminal](./capminal) | Interact with Cap Wallet via Capminal API | AndreaPN |
 
 ## Installation
 
 ### Via OpenClaw Chat
 ```
-install this skill: https://github.com/user/openclaw-skills/tree/main/skill-name
+install this skill: https://github.com/Capminal/openclaw-skills/tree/main/capminal
 ```
 
 ### Manual Installation
 ```bash
-git clone https://github.com/user/openclaw-skills.git
-cp -r openclaw-skills/skill-name ~/.openclaw/skills/
+git clone https://github.com/Capminal/openclaw-skills.git
+cp -r openclaw-skills/capminal ~/.openclaw/skills/
 ```
 
 ## Contributing
@@ -37,9 +36,8 @@ We welcome contributions! To add a new skill:
 3. **Add** required files:
    ```
    your-skill-name/
-   ├── SKILL.md        # Required: Tool definition
-   ├── _meta.json      # Required: Metadata
-   └── scripts/        # Optional: Executable scripts
+   ├── SKILL.md        # Required: Instructions for agents
+   └── _meta.json      # Required: Metadata
    ```
 4. **Submit** a Pull Request
 
@@ -52,34 +50,41 @@ description: What your skill does
 version: 1.0.0
 author: YourName
 tags: [tag1, tag2]
-requires: [ENV_VAR_IF_NEEDED]
 ---
 
-## How to use this skill
+# Your Skill Name
 
-You have access to a tool called `your_tool_name`.
+Description of what this skill does.
 
-**Tool signature / schema**
-\```tool
+## Authentication & Security
+
+Instructions for handling API keys securely.
+
+## API Endpoints
+
+### Endpoint Name
+
+**Request:**
+\```bash
+curl -X GET "https://api.example.com/endpoint" \
+  -H "API_KEY: YOUR_API_KEY"
+\```
+
+**Example Response:**
+\```json
 {
-  "name": "your_tool_name",
-  "description": "Tool description",
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "param1": {
-        "type": "string",
-        "description": "Parameter description"
-      }
-    },
-    "required": ["param1"]
-  }
+  "success": true,
+  "data": {}
 }
 \```
 
-## Execution instructions
+## Usage Instructions
 
-Instructions for the agent on how to use this tool.
+Step-by-step instructions for agents.
+
+## Error Handling
+
+How to handle common errors.
 ```
 
 ### _meta.json Template
@@ -99,9 +104,9 @@ Instructions for the agent on how to use this tool.
 ## Guidelines
 
 - Keep skills focused on a single purpose
-- Include clear documentation in SKILL.md
-- Handle errors gracefully in scripts
-- Use environment variables for sensitive data (API keys)
+- Include clear API documentation with examples
+- Always instruct agents to secure API keys
+- Ask users for missing credentials
 - Test your skill before submitting
 
 ## License
@@ -113,4 +118,3 @@ MIT License - See [LICENSE](./LICENSE) for details.
 - [Capminal](https://www.capminal.ai/)
 - [OpenClaw Documentation](https://openclaw.ai/docs)
 - [ClawHub Marketplace](https://www.clawhub.ai/skills)
-- [Awesome OpenClaw Skills](https://github.com/VoltAgent/awesome-openclaw-skills)
