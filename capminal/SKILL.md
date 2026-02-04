@@ -176,15 +176,7 @@ curl -X POST "https://terminal-api.dackieswap.xyz/api/gems" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My Token",
-    "symbol": "MTK",
-    "description": "A cool memecoin",
-    "imageUrl": "https://example.com/logo.png",
-    "fee": "1",
-    "marketCap": "10E",
-    "initialBuyAmount": "0.01",
-    "telegramLink": "https://t.me/mytoken",
-    "twitterLink": "https://twitter.com/mytoken",
-    "websiteLink": "https://mytoken.com"
+    "symbol": "MTK"
   }'
 ```
 
@@ -193,20 +185,20 @@ curl -X POST "https://terminal-api.dackieswap.xyz/api/gems" \
 |-----------|------|-------------|
 | name | string | Token name |
 | symbol | string | Token symbol (ticker) |
-| fee | string | Pool fee percentage (e.g., "1") |
-| marketCap | string | Market cap tier: "10E" or "20E" |
-| initialBuyAmount | string | Initial ETH amount to buy (e.g., "0.01") |
 
-**Optional Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| description | string | Token description |
-| imageUrl | string | Token logo URL |
-| secondsToDecay | number | Decay time in seconds |
-| telegramLink | string | Telegram group link |
-| twitterLink | string | Twitter/X link |
-| farcasterLink | string | Farcaster link |
-| websiteLink | string | Website URL |
+**Optional Parameters (with defaults):**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| marketCap | string | "10E" | Market cap tier: "10E" or "20E" |
+| fee | string | "1" | Pool fee percentage |
+| initialBuyAmount | string | "0" | Initial ETH amount to buy |
+| description | string | - | Token description |
+| imageUrl | string | - | Token logo URL |
+| secondsToDecay | number | - | Decay time in seconds |
+| telegramLink | string | - | Telegram group link |
+| twitterLink | string | - | Twitter/X link |
+| farcasterLink | string | - | Farcaster link |
+| websiteLink | string | - | Website URL |
 
 **Example Response:**
 ```json
@@ -236,26 +228,36 @@ Transaction: https://basescan.org/tx/0x123abc456def...
 **User:** "Deploy a token called DOGE with symbol DOGE"
 
 **Agent should:**
-1. Check if `CAP_API_KEY` is set
+1. Check if `CAP_API_KEY` is set (check `cap_credentials.json` first, then `.env`)
 2. If not set, ask user to get key from https://www.capminal.ai/profile
-3. Ask user for missing required parameters:
-   - fee (suggest "1")
-   - marketCap (suggest "10E" for ~$10k starting cap, "20E" for ~$20k)
-   - initialBuyAmount (how much ETH to buy initially, e.g., "0.01")
-4. Make the API call:
+3. Make the API call with defaults (marketCap: "10E", fee: "1", initialBuyAmount: "0"):
    ```bash
    curl -X POST "https://terminal-api.dackieswap.xyz/api/gems" \
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
        "name": "DOGE",
-       "symbol": "DOGE",
-       "fee": "1",
-       "marketCap": "10E",
-       "initialBuyAmount": "0.01"
+       "symbol": "DOGE"
      }'
    ```
-5. Return deployment result with transaction hash and token address
+4. Return deployment result with transaction hash and token address
+
+**User:** "Deploy token PEPE with 0.05 ETH initial buy"
+
+**Agent should:**
+1. Check if `CAP_API_KEY` is set
+2. Make the API call with custom initialBuyAmount:
+   ```bash
+   curl -X POST "https://terminal-api.dackieswap.xyz/api/gems" \
+     -H "x-cap-api-key: $CAP_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "PEPE",
+       "symbol": "PEPE",
+       "initialBuyAmount": "0.05"
+     }'
+   ```
+3. Return deployment result
 
 ---
 
