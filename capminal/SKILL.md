@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet and deploy Clanker tokens
-version: 0.5.0
+version: 0.6.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap]
 ---
@@ -282,7 +282,7 @@ curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/trade" \
   -H "x-cap-api-key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "sellToken": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+    "sellToken": "0x0000000000000000000000000000000000000000",
     "buyToken": "0xabc123...",
     "sellAmount": "0.01",
     "slippage": "1500"
@@ -303,7 +303,7 @@ When user inputs token symbol instead of address, use these addresses:
 
 | Symbol | Address |
 |--------|---------|
-| ETH | `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE` |
+| ETH | `0x0000000000000000000000000000000000000000` |
 | USDC | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` |
 
 **IMPORTANT:** Always convert token symbols to their contract addresses before making the API call.
@@ -314,7 +314,7 @@ curl -X POST "https://terminal-api.dackieswap.xyz/api/gems/trade" \
   -H "x-cap-api-key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "sellToken": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+    "sellToken": "0x0000000000000000000000000000000000000000",
     "buyToken": "0x73326b4d0225c429bed050c11c4422d91470aaf4",
     "sellAmount": "50%",
     "slippage": "1500"
@@ -357,7 +357,7 @@ Transaction: https://basescan.org/tx/0xdef789abc123...
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
-       "sellToken": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+       "sellToken": "0x0000000000000000000000000000000000000000",
        "buyToken": "0xabc123...",
        "sellAmount": "0.05"
      }'
@@ -378,7 +378,7 @@ Transaction: https://basescan.org/tx/0xdef789abc123...
      -H "Content-Type: application/json" \
      -d '{
        "sellToken": "[MTK_TOKEN_ADDRESS]",
-       "buyToken": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+       "buyToken": "0x0000000000000000000000000000000000000000",
        "sellAmount": "1000"
      }'
    ```
@@ -396,7 +396,7 @@ Transaction: https://basescan.org/tx/0xdef789abc123...
      -H "x-cap-api-key: $CAP_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{
-       "sellToken": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+       "sellToken": "0x0000000000000000000000000000000000000000",
        "buyToken": "0x73326b4d0225c429bed050c11c4422d91470aaf4",
        "sellAmount": "50%"
      }'
