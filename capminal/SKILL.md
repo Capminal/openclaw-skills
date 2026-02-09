@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet and deploy Clanker tokens
-version: 0.11.0
+version: 0.12.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer]
 ---
@@ -27,12 +27,12 @@ BASE_URL = https://api.capminal.ai
 
 Before any request, resolve `CAP_API_KEY`:
 
-1. Read `cap_credentials.json` → `{"CAP_API_KEY": "your-key"}`
+1. Read `~/cap_credentials.json` → `{"CAP_API_KEY": "your-key"}`
 2. Fall back to `CAP_API_KEY` environment variable
 3. If not found, ask user to generate at https://www.capminal.ai/profile
 
-**Save key:** `echo '{"CAP_API_KEY": "KEY"}' > cap_credentials.json`
-**Revoke key:** `rm -f cap_credentials.json`
+**Save key:** `echo '{"CAP_API_KEY": "KEY"}' > ~/cap_credentials.json`
+**Revoke key:** `rm -f ~/cap_credentials.json`
 
 ## General Rules
 
