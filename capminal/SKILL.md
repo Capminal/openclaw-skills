@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet and deploy Clanker tokens
-version: 0.10.0
+version: 0.11.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer]
 ---
