@@ -136,7 +136,13 @@ curl -s -X GET "${BASE_URL}/api/wallet/balance" \
     -H "x-cap-api-key: $CAP_API_KEY"
   ```
 
-**Step 3: Handle dollar ($) amounts**
+**Step 3: Validate sufficient balance**
+
+Check if the sell token has enough balance (in USD value) to cover the trade:
+- If sufficient: proceed to execute trade.
+- If insufficient: DO NOT just say "insufficient balance" and stop. Instead, automatically list all other tokens in the wallet that have enough `usd_value` to cover the requested amount, showing each token's symbol, available balance, and USD value. Let the user pick which one to use instead.
+
+**Step 4: Handle dollar ($) amounts**
 
 If user specifies amount in USD (e.g., "$50 worth of VIRTUAL", "buy $100 of ETH"):
 1. Get the token's `usd_price` from wallet balance or resolve-tokens response
@@ -178,7 +184,7 @@ For any other symbol, resolve via wallet balance or Resolve Tokens API.
 ### Trade Examples
 
 - **"Buy 0.05 ETH worth of 0xabc..."** → sellToken=ETH address, buyToken=0xabc..., sellAmount="0.05"
-- **"Buy $50 of VIRTUAL"** → Check balance for VIRTUAL's usd_price → calculate ETH amount: 50 / eth_usd_price → sellToken=ETH, buyToken=VIRTUAL address, sellAmount=calculated
+- **"Buy $50 of VIRTUAL"** → calculate ETH amount: 50 / eth_usd_price → sellToken=ETH, buyToken=VIRTUAL address, sellAmount=calculated
 - **"Sell 50% of my VIRTUAL for ETH"** → sellToken=VIRTUAL address (from balance), buyToken=ETH address, sellAmount="50%"
 - **"Swap $200 of ETH to USDC"** → ETH usd_price from balance → sellAmount = 200 / eth_usd_price → sellToken=ETH, buyToken=USDC address
 
