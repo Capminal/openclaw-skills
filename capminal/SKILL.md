@@ -1,9 +1,9 @@
 ---
 name: Capminal
-description: OpenClaw agents can interact with Cap Wallet and deploy Clanker tokens
-version: 0.12.0
+description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit orders
+version: 0.14.0
 author: AndreaPN
-tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer]
+tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer, limit-order]
 ---
 
 # Capminal - Cap Wallet Integration
@@ -210,3 +210,135 @@ curl -s -X POST "${BASE_URL}/api/gems/transfer" \
 Use Common Addresses table from Trade section for symbol-to-address conversion. For unknown symbols, use Resolve Tokens API.
 
 **Response:** `data.transactionHash`, `data.inputSymbol`, `data.inputAmount`, `data.inputAmountUsd`, `data.toAddress`. Show tx link: `https://basescan.org/tx/{hash}`
+
+---
+
+## 6. Get Clanker Rewards
+
+**Triggers:** clanker rewards, uncollected rewards, pending rewards, rewards list
+
+```bash
+curl -s -X GET "${BASE_URL}/api/wallet/getUncollectedV4Rewards" \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+**Response contains:** `data[]` with `tokenAddress`, `tokenSymbol`, `tokenName`, `fee`, `poolId`, `imageUrl`.
+
+**Display as table:** Token | Token Address | Fee | Pool ID
+
+---
+
+## 7. Claim Clanker Rewards
+
+**Triggers:** claim rewards, claim clanker rewards, collect rewards
+
+### Pre-Claim Check (REQUIRED)
+
+Before claiming, ALWAYS call **Get Clanker Rewards** first:
+
+```bash
+curl -s -X GET "${BASE_URL}/api/wallet/getUncollectedV4Rewards" \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+- If `data[]` is empty: tell user no claimable rewards and stop.
+- If user provides `tokenAddress`: claim only if that address exists in `data[]`.
+- If provided token is not in `data[]`: do not claim; show available reward tokens (`tokenSymbol`, `tokenAddress`) and ask user to choose one.
+
+```bash
+curl -s -X POST "${BASE_URL}/api/wallet/claimClankerRewards" \
+  -H "x-cap-api-key: $CAP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0x..."
+  }'
+```
+
+**Required:** `tokenAddress`.
+
+**Response:** `data.transactionHash`. Show tx link: `https://basescan.org/tx/{hash}`
+
+---
+
+## 8. Get Limit Orders
+
+**Triggers:** limit orders, open orders, pending orders, list limit orders
+
+Default to `status=PENDING` unless user asks another status.
+
+```bash
+curl -s -X GET "${BASE_URL}/api/cap-limit-order?status=PENDING" \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+Optional filters: `status` (`PENDING|EXECUTING|COMPLETED|CANCELLED|EXPIRED|FAILED`), `orderType` (`BUY|SELL`).
+
+**Response contains:** `data[]` orders with fields like `id`, `status`, `orderType`, `tokenSymbol`, `quoteTokenSymbol`, `tokenAmount`, `expectedPrice`, `expiresAt`.
+
+**Display simple (per order):**
+```
+order id {id}
+{status} {orderType} {tokenSymbol} by {quoteTokenSymbol}
+Amount: {tokenAmount} {tokenSymbol}
+Price: {expectedPrice} USD
+Amount USD: ${tokenAmount * expectedPrice} USD
+Expires: {expiresAt}
+```
+
+Use 2 decimals for `Amount USD` and US datetime format for `Expires`.
+
+---
+
+## 9. Create Limit Order
+
+**Triggers:** create limit order, place limit order, set buy limit, set sell limit
+
+### Pre-Create Flow (REQUIRED)
+
+- If `tokenAddress` or `expectedPrice` is unclear, resolve token first.
+- Check wallet balance tokens first (`/api/wallet/balance`) to map symbol -> `token_address` and `usd_price`.
+- If still unclear, call Resolve Tokens API:
+  ```bash
+  curl -s "${BASE_URL}/api/token/resolve-tokens?symbols=SYMBOL" \
+    -H "x-cap-api-key: $CAP_API_KEY"
+  ```
+- Use resolved `address` as `tokenAddress`.
+- If user does not provide price, use resolved `usd_price` as `expectedPrice` and tell user before creating.
+
+```bash
+curl -s -X POST "${BASE_URL}/api/cap-limit-order" \
+  -H "x-cap-api-key: $CAP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0x...",
+    "tokenAmount": "19831.920868",
+    "quoteTokenAddress": "0x0000000000000000000000000000000000000000",
+    "expectedPrice": "0.0868619",
+    "duration": 604800,
+    "orderType": "SELL",
+    "chainId": 8453
+  }'
+```
+
+**Required:** `tokenAddress`, `tokenAmount`, `expectedPrice`, `duration`, `orderType`.
+
+**Optional:** `quoteTokenAddress` (default ETH/native), `chainId` (default `8453`).
+
+**Response:** `data.id` (new order id).
+
+---
+
+## 10. Cancel Limit Order
+
+**Triggers:** cancel limit order, remove limit order, stop limit order
+
+Only `PENDING` orders can be cancelled.
+
+```bash
+curl -s -X DELETE "${BASE_URL}/api/cap-limit-order/123" \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+Replace `123` with actual order id.
+
+**Response:** `data.id` (cancelled order id).
