@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit orders
-version: 0.15.0
+version: 0.16.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer, limit-order]
 ---
@@ -248,7 +248,7 @@ curl -s -X GET "${BASE_URL}/api/wallet/getUncollectedV4Rewards" \
 - If provided token is not in `data[]`: do not claim; show available reward tokens (`tokenSymbol`, `tokenAddress`) and ask user to choose one.
 
 ```bash
-curl -s -X POST "${BASE_URL}/api/wallet/claimClankerRewards" \
+curl -s -X POST "${BASE_URL}/api/wallet/claimClankerV4Rewards" \
   -H "x-cap-api-key: $CAP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
