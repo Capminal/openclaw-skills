@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit orders
-version: 0.16.0
+version: 0.17.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer, limit-order]
 ---
@@ -39,6 +39,19 @@ Before any request, resolve `CAP_API_KEY`:
 - Always wait for complete API response before answering
 - On 401: ask user to update key. On 429: wait and retry
 
+### Table Format (REQUIRED)
+
+Use simple table format in monospace block:
+```text
+Col 1 | Col 2 | ... | Col n
+Row 1a| Row 1b| ... | Row 1n
+```
+
+Rules:
+- Pad spaces in each column to the longest value in that column so `|` stays aligned.
+- No markdown separator rows like `|---|`.
+- Keep width mobile-friendly when possible.
+
 ---
 
 ## 1. Get Wallet Balance
@@ -52,7 +65,7 @@ curl -s -X GET "${BASE_URL}/api/wallet/balance" \
 
 **Response contains:** `data.address`, `data.balance` (total USD), and `data.tokens[]` with `symbol`, `token_address`, `balance_formatted`, `usd_price`, `usd_value` for each token.
 
-**Display as table:** Token | Address | Amount | USD Value
+**Display as table:** `Token | Address | Amount | USD Value` (apply Table Format rule)
 
 ---
 
@@ -164,18 +177,20 @@ curl -s -X POST "${BASE_URL}/api/gems/trade" \
 ```
 
 **Parameters:**
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| sellToken | Yes | Token address to sell |
-| buyToken | Yes | Token address to buy |
-| sellAmount | Yes | Amount to sell (absolute e.g. "0.01", or percentage e.g. "50%") |
-| slippage | No | Basis points, default "1500" (15%) |
+```text
+Parameter  | Required | Description
+sellToken  | Yes      | Token address to sell
+buyToken   | Yes      | Token address to buy
+sellAmount | Yes      | Amount to sell (absolute e.g. "0.01", or percentage e.g. "50%")
+slippage   | No       | Basis points, default "1500" (15%)
+```
 
 **Common Addresses:**
-| Symbol | Address |
-|--------|---------|
-| ETH | `0x0000000000000000000000000000000000000000` |
-| USDC | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` |
+```text
+Symbol | Address
+ETH    | 0x0000000000000000000000000000000000000000
+USDC   | 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
+```
 
 For any other symbol, resolve via wallet balance or Resolve Tokens API.
 
@@ -226,7 +241,7 @@ curl -s -X GET "${BASE_URL}/api/wallet/getUncollectedV4Rewards" \
 
 Only display rewards with amount `> 0` (hide zero/empty rewards).
 
-**Display as table:** Token | Token Address | Fee | Pool ID
+**Display as table:** `Token | Token Address | Fee | Pool ID` (apply Table Format rule)
 
 ---
 
@@ -277,10 +292,10 @@ Optional filters: `status` (`PENDING|EXECUTING|COMPLETED|CANCELLED|EXPIRED|FAILE
 
 **Response contains:** `data[]` orders with fields like `id`, `status`, `orderType`, `tokenSymbol`, `quoteTokenSymbol`, `tokenAmount`, `expectedPrice`, `expiresAt`.
 
-**Display as table:** Order ID | Status | Type | Token | Quote Token | Amount | Price (USD) | Amount USD | Expires
+**Display as table:** `Order ID | Status | Type | Token | Quote Token | Amount | Price (USD) | Amount USD | Expires`
 
 Row values:
-`{id}` | `{status}` | `{orderType}` | `{tokenSymbol}` | `{quoteTokenSymbol}` | `{tokenAmount} {tokenSymbol}` | `{expectedPrice}` | `${tokenAmount * expectedPrice}` | `{expiresAt}`
+`{id}` | `{status}` | `{orderType}` | `{tokenSymbol}` | `{quoteTokenSymbol}` | `{tokenAmount} {tokenSymbol}` | `{expectedPrice}` | `${tokenAmount * expectedPrice}` | `{expiresAt}` (pad columns using longest value)
 
 Use 2 decimals for `Amount USD` and US datetime format for `Expires`.
 
