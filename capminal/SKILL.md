@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit orders
-version: 0.14.0
+version: 0.15.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer, limit-order]
 ---
@@ -224,6 +224,8 @@ curl -s -X GET "${BASE_URL}/api/wallet/getUncollectedV4Rewards" \
 
 **Response contains:** `data[]` with `tokenAddress`, `tokenSymbol`, `tokenName`, `fee`, `poolId`, `imageUrl`.
 
+Only display rewards with amount `> 0` (hide zero/empty rewards).
+
 **Display as table:** Token | Token Address | Fee | Pool ID
 
 ---
@@ -275,15 +277,10 @@ Optional filters: `status` (`PENDING|EXECUTING|COMPLETED|CANCELLED|EXPIRED|FAILE
 
 **Response contains:** `data[]` orders with fields like `id`, `status`, `orderType`, `tokenSymbol`, `quoteTokenSymbol`, `tokenAmount`, `expectedPrice`, `expiresAt`.
 
-**Display simple (per order):**
-```
-order id {id}
-{status} {orderType} {tokenSymbol} by {quoteTokenSymbol}
-Amount: {tokenAmount} {tokenSymbol}
-Price: {expectedPrice} USD
-Amount USD: ${tokenAmount * expectedPrice} USD
-Expires: {expiresAt}
-```
+**Display as table:** Order ID | Status | Type | Token | Quote Token | Amount | Price (USD) | Amount USD | Expires
+
+Row values:
+`{id}` | `{status}` | `{orderType}` | `{tokenSymbol}` | `{quoteTokenSymbol}` | `{tokenAmount} {tokenSymbol}` | `{expectedPrice}` | `${tokenAmount * expectedPrice}` | `{expiresAt}`
 
 Use 2 decimals for `Amount USD` and US datetime format for `Expires`.
 
