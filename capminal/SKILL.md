@@ -1,9 +1,9 @@
 ---
 name: Capminal
-description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit orders
-version: 0.17.0
+description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
+version: 0.18.0
 author: AndreaPN
-tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer, limit-order]
+tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer, limit-order, twap]
 ---
 
 # Capminal - Cap Wallet Integration
@@ -354,3 +354,78 @@ curl -s -X DELETE "${BASE_URL}/api/cap-limit-order/123" \
 Replace `123` with actual order id.
 
 **Response:** `data.id` (cancelled order id).
+
+---
+
+## 11. Get TWAP Orders
+
+**Triggers:** twap orders, list twap, open twap, pending twap, twap list
+
+Default to `status=ACTIVE` unless user asks another status.
+
+```bash
+curl -s -X GET "${BASE_URL}/api/twap?status=ACTIVE" \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+Optional filters: `status` (`ACTIVE|COMPLETED|CANCELLED|EXPIRED|FAILED`), `orderType` (`BUY|SELL`).
+
+**Response contains:** `data[]` orders with fields like `id`, `status`, `orderType`, `tokenSymbol`, `quoteTokenSymbol`, `totalAmount`, `amountPerInterval`, `intervalSeconds`, `allowedGain`, `initialPriceUsd`, `executedCount`, `totalExpectedCount`, `expiresAt`.
+
+**Display as table:** `Order ID | Status | Type | Token | Quote Token | Total Amount | Per Interval | Count | Allowed Gain | Initial Price (USD) | Expires`
+
+`Count` format: `{executedCount}/{totalExpectedCount}` (example: `13/72`).
+
+---
+
+## 12. Create TWAP Order
+
+**Triggers:** create twap, place twap, set twap order, twap buy, twap sell
+
+### Pre-Create Flow (REQUIRED)
+
+- If user gives symbol instead of address, resolve token first from wallet balance (`/api/wallet/balance`) or Resolve Tokens API.
+- If `quoteTokenAddress` is missing, use native ETH address.
+- If `allowedGain` is missing, temporarily default to `"15"` (user can override later).
+- If `duration` is missing, temporarily default to `604800` (7 days).
+- If `intervalSeconds` is missing, temporarily default to `3600` (1 hour).
+- Ensure `duration >= intervalSeconds`, and `intervalSeconds` is between `600` and `86400`.
+
+```bash
+curl -s -X POST "${BASE_URL}/api/twap" \
+  -H "x-cap-api-key: $CAP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0x...",
+    "quoteTokenAddress": "0x0000000000000000000000000000000000000000",
+    "totalAmount": "1000",
+    "duration": 604800,
+    "intervalSeconds": 3600,
+    "allowedGain": "15",
+    "orderType": "SELL",
+    "chainId": 8453
+  }'
+```
+
+**Required:** `tokenAddress`, `totalAmount`, `duration`, `intervalSeconds`, `allowedGain`, `orderType`.
+
+**Optional:** `quoteTokenAddress` (default ETH/native), `chainId` (default `8453`).
+
+**Response:** `data.id` (new TWAP order id).
+
+---
+
+## 13. Cancel TWAP Order
+
+**Triggers:** cancel twap, delete twap, remove twap order, stop twap
+
+Only `ACTIVE` TWAP orders can be cancelled.
+
+```bash
+curl -s -X DELETE "${BASE_URL}/api/twap/123" \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+Replace `123` with TWAP order id.
+
+**Response:** `data.id` (cancelled TWAP order id).
