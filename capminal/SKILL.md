@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.18.0
+version: 0.19.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer, limit-order, twap]
 ---
@@ -38,6 +38,7 @@ Before any request, resolve `CAP_API_KEY`:
 
 - Always wait for complete API response before answering
 - On 401: ask user to update key. On 429: wait and retry
+- Always return full string for EVM address, token address
 
 ### Table Format (REQUIRED)
 
