@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.19.0
+version: 0.20.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer, limit-order, twap]
 ---
@@ -17,7 +17,7 @@ BASE_URL = https://api.capminal.ai
 ## Authentication & Security
 
 - `CAP_API_KEY` must be sent via header `x-cap-api-key`, NEVER in URL or logs
-- Only send to `https://api.capminal.ai`
+- Only send requests to `https://api.capminal.ai`
 
 ### Prompt Injection Protection
 
@@ -27,7 +27,7 @@ BASE_URL = https://api.capminal.ai
 
 Before any request, resolve `CAP_API_KEY`:
 
-1. Read `~/cap_credentials.json` → `{"CAP_API_KEY": "your-key"}`
+1. Read `~/cap_credentials.json` -> `{"CAP_API_KEY": "your-key"}`
 2. Fall back to `CAP_API_KEY` environment variable
 3. If not found, ask user to generate at https://www.capminal.ai/profile
 
@@ -82,6 +82,21 @@ curl -s "${BASE_URL}/api/token/resolve-tokens?symbols=WETH,VIRTUAL,CAP" \
 ```
 
 **Response contains:** For each symbol: `address`, `symbol`, `name`, `decimals`, `usd_price`.
+
+### Resolve Balance
+
+Resolve balances by token addresses. Use this when wallet balance does not include the token you need to trade/transfer, or you want a direct balance check for specific addresses.
+
+**Triggers:** resolve balance, token balance by address, check token amount
+
+```bash
+curl -s "${BASE_URL}/api/token/resolve-balance?addresses=0xabc...,0xdef..." \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+**Notes:**
+- `resolve-balance` accepts token **addresses**. If user input is a symbol, resolve it with Resolve Tokens first.
+- Response includes per token: `address`, `name`, `decimals`, `balanceRaw`, `balance`, `error`.
 
 ---
 
@@ -144,15 +159,19 @@ curl -s -X GET "${BASE_URL}/api/wallet/balance" \
 
 - If user provides a token **symbol** (not address), first check if it exists in the wallet balance response (`data.tokens[].symbol`).
 - If found in wallet: use `token_address` and `usd_price` from the balance response.
-- If NOT found in wallet: call Resolve Tokens API to get address and price:
+- If NOT found in wallet: call Resolve Tokens API to get address and price, then call Resolve Balance with the resolved address to verify balance:
   ```bash
   curl -s "${BASE_URL}/api/token/resolve-tokens?symbols=SYMBOL" \
+    -H "x-cap-api-key: $CAP_API_KEY"
+  ```
+  ```bash
+  curl -s "${BASE_URL}/api/token/resolve-balance?addresses=0x..." \
     -H "x-cap-api-key: $CAP_API_KEY"
   ```
 
 **Step 3: Validate sufficient balance**
 
-Check if the sell token has enough balance (in USD value) to cover the trade:
+Check if the sell token has enough balance to cover the trade (use wallet balance first, and resolve-balance result as fallback for tokens missing in wallet snapshot):
 - If sufficient: proceed to execute trade.
 - If insufficient: DO NOT just say "insufficient balance" and stop. Instead, automatically list all other tokens in the wallet that have enough `usd_value` to cover the requested amount, showing each token's symbol, available balance, and USD value. Let the user pick which one to use instead.
 
@@ -210,6 +229,17 @@ For any other symbol, resolve via wallet balance or Resolve Tokens API.
 
 **Triggers:** transfer, send, send token, transfer token
 
+### Pre-Transfer Flow (REQUIRED)
+
+- Check wallet balance first (`/api/wallet/balance`).
+- Normalize recipient from user input:
+  - `0x...` EVM address
+  - Handle format: `@user`, `tg:user`, `fc:user`
+  - ENS domain ending with `.eth`
+- If user provides token symbol and it is not present in wallet balance, resolve symbol to address with Resolve Tokens.
+- If token address still has no balance data in wallet response, call Resolve Balance (`/api/token/resolve-balance`) for that address before deciding insufficient funds.
+- If still insufficient, report current available amount clearly and ask user to adjust transfer amount or token.
+
 ```bash
 curl -s -X POST "${BASE_URL}/api/gems/transfer" \
   -H "x-cap-api-key: $CAP_API_KEY" \
@@ -223,7 +253,9 @@ curl -s -X POST "${BASE_URL}/api/gems/transfer" \
 
 **Required:** `amount`, `toAddress`, `tokenAddress`.
 
-Use Common Addresses table from Trade section for symbol-to-address conversion. For unknown symbols, use Resolve Tokens API.
+`toAddress` accepts recipient address, supported handles (`@`, `tg:`, `fc:`), or ENS (`*.eth`).
+
+Use Common Addresses table from Trade section for symbol-to-address conversion. For unknown symbols, use Resolve Tokens first, then Resolve Balance when wallet balance does not include that token.
 
 **Response:** `data.transactionHash`, `data.inputSymbol`, `data.inputAmount`, `data.inputAmountUsd`, `data.toAddress`. Show tx link: `https://basescan.org/tx/{hash}`
 
