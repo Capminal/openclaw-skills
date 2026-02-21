@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.21.0
+version: 0.21.1
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer, limit-order, twap]
 ---
@@ -92,7 +92,7 @@ curl -s "${BASE_URL}/api/token/resolve-addresses?addresses=0xabc...,0xdef..." \
 
 **Response contains:** For each address: `priceUsd`, `symbol`, `name`, `address`, `fdv`, `marketCap`, `pairAge`, `error`.
 
-**Display as table:** `Symbol | Name | Price (USD) | Market Cap | FDV | Pair Age |  Address | Error` (apply Table Format rule)
+**Display as table:** `Address | Symbol | Name | Price (USD) | Market Cap | FDV | Pair Age |  Error` (apply Table Format rule)
 
 **Required flow for symbol-only input (IMPORTANT):**
 - If user asks token price/market cap/info but only gives **symbol** (no address), call `resolve-tokens` first to get address.
