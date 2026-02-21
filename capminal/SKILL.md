@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.20.0
+version: 0.21.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, balance, clanker, token-deployment, swap, transfer, limit-order, twap]
 ---
@@ -42,16 +42,12 @@ Before any request, resolve `CAP_API_KEY`:
 
 ### Table Format (REQUIRED)
 
-Use simple table format in monospace block:
-```text
-Col 1 | Col 2 | ... | Col n
-Row 1a| Row 1b| ... | Row 1n
+For table outputs, always return in standard markdown table format:
+```markdown
+| Col 1  | Col 2  | ... | Col n  |
+| ------ | ------ | --- | ------ |
+| Row 1a | Row 1b | ... | Row 1n |
 ```
-
-Rules:
-- Pad spaces in each column to the longest value in that column so `|` stays aligned.
-- No markdown separator rows like `|---|`.
-- Keep width mobile-friendly when possible.
 
 ---
 
@@ -72,16 +68,36 @@ curl -s -X GET "${BASE_URL}/api/wallet/balance" \
 
 ## 2. Resolve Tokens
 
-Resolve token symbols to addresses and prices. Use when a token symbol is not found in wallet balance or when you need current price/address for a symbol.
+Resolve token symbols to addresses (and basic metadata). Use when user input is symbol only, or when symbol is not found in wallet balance.
 
-**Triggers:** resolve token, token info, token price, token address
+**Triggers:** resolve token, resolve symbol, token address from symbol
 
 ```bash
 curl -s "${BASE_URL}/api/token/resolve-tokens?symbols=WETH,VIRTUAL,CAP" \
   -H "x-cap-api-key: $CAP_API_KEY"
 ```
 
-**Response contains:** For each symbol: `address`, `symbol`, `name`, `decimals`, `usd_price`.
+**Response contains:** For each symbol: `chainId`, `address`, `symbol`, `name`, `decimals`, `priceUsd`.
+
+### Resolve Addresses
+
+Resolve token **addresses** to market data. Use this when user asks for token price, market cap, FDV, pair age, or token market info.
+
+**Triggers:** token info, token price, market cap, fdv, pair age, check token data
+
+```bash
+curl -s "${BASE_URL}/api/token/resolve-addresses?addresses=0xabc...,0xdef..." \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+**Response contains:** For each address: `priceUsd`, `symbol`, `name`, `address`, `fdv`, `marketCap`, `pairAge`, `error`.
+
+**Display as table:** `Symbol | Name | Price (USD) | Market Cap | FDV | Pair Age |  Address | Error` (apply Table Format rule)
+
+**Required flow for symbol-only input (IMPORTANT):**
+- If user asks token price/market cap/info but only gives **symbol** (no address), call `resolve-tokens` first to get address.
+- Then call `resolve-addresses` with the resolved address(es).
+- Do not stop at `resolve-tokens` when user intent is market info.
 
 ### Resolve Balance
 
@@ -137,6 +153,8 @@ curl -s -X POST "${BASE_URL}/api/gems/createGem" \
 
 **Optional:** `description`, `imageUrl`, `secondsToDecay`, `telegramLink`, `twitterLink`, `farcasterLink`, `websiteLink`.
 
+**Image handling:** If the user wants a token image, they must provide a public HTTPS URL (e.g., hosted on Imgur, Cloudflare, etc.). Pass it as `imageUrl` in the request body. If user sends an image attachment without providing a URL in text, ask them to upload it to a hosting service and share the direct link.
+
 **Response:** `data.transactionHash`, `data.poolId`, `data.tokenAddress`. Show tx link: `https://basescan.org/tx/{hash}`
 
 ---
@@ -178,8 +196,8 @@ Check if the sell token has enough balance to cover the trade (use wallet balanc
 **Step 4: Handle dollar ($) amounts**
 
 If user specifies amount in USD (e.g., "$50 worth of VIRTUAL", "buy $100 of ETH"):
-1. Get the token's `usd_price` from wallet balance or resolve-tokens response
-2. Calculate: `sellAmount = dollarAmount / usd_price`
+1. Get the token's `usd_price` from wallet balance, or `priceUsd` from resolve-tokens response
+2. Calculate: `sellAmount = dollarAmount / token_usd_price`
 3. Use the calculated token amount as `sellAmount` in the trade request
 
 ### Execute Trade
@@ -348,7 +366,7 @@ Use 2 decimals for `Amount USD` and US datetime format for `Expires`.
     -H "x-cap-api-key: $CAP_API_KEY"
   ```
 - Use resolved `address` as `tokenAddress`.
-- If user does not provide price, use resolved `usd_price` as `expectedPrice` and tell user before creating.
+- If user does not provide price, use wallet `usd_price` or resolved `priceUsd` as `expectedPrice` and tell user before creating.
 
 ```bash
 curl -s -X POST "${BASE_URL}/api/cap-limit-order" \
