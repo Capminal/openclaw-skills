@@ -1,9 +1,9 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.23.0
+version: 0.24.0
 author: AndreaPN
-tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking]
+tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking, xp-leaderboard]
 ---
 
 # Capminal - Cap Wallet Integration
@@ -564,3 +564,57 @@ curl -s -X POST "${BASE_URL}/api/staking/unstake" \
 **Required:** `amount` (token amount to unstake).
 
 **Response:** `data.transactionHash`, `data.amount`. Show tx link: `https://basescan.org/tx/{hash}`
+
+---
+
+## 17. Reward CAP XP Leaderboard
+
+**Triggers:** reward xp, reward cap xp, distribute to xp holders, xp leaderboard reward, airdrop xp holders
+
+Distribute tokens to all CAP XP holders proportionally based on their total points.
+
+### Pre-Reward Flow (REQUIRED)
+
+Before distributing, ALWAYS follow these steps:
+
+**Step 1: Check wallet balance**
+```bash
+curl -s -X GET "${BASE_URL}/api/wallet/balance" \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+- Verify the token to distribute has sufficient balance to cover `amount`.
+- If user provides a symbol, resolve to address using wallet balance or Resolve Tokens API.
+- If insufficient: inform user of current balance and stop.
+
+**Step 2: Resolve token address if needed**
+
+- If user provides a token **symbol** (not address), check wallet balance response (`data.tokens[].symbol`) — use `token_address`.
+- If NOT found in wallet: call Resolve Tokens API to get address.
+
+### Execute Reward
+
+```bash
+curl -s -X POST "${BASE_URL}/api/wallet/rewardCapXP" \
+  -H "x-cap-api-key: $CAP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chainId": "8453",
+    "tokenAddress": "0x...",
+    "amount": "1000"
+  }'
+```
+
+**Required:** `chainId`, `tokenAddress`, `amount`.
+
+**Parameters:**
+```text
+Parameter    | Required | Description
+chainId      | Yes      | Chain ID (string, e.g. "8453")
+tokenAddress | Yes      | Token address to distribute (use 0x0000000000000000000000000000000000000000 for ETH)
+amount       | Yes      | Total amount to distribute (token amount or percentage like "50%")
+```
+
+**Display as table:** `Transaction Hash | Amount | Token` (apply Table Format rule)
+
+**Response:** `data.transactionHash`. Show tx link: `https://basescan.org/tx/{hash}`
