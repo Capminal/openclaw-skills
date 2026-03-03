@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.24.1
+version: 0.24.2
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking, cap-guild]
 ---
@@ -569,9 +569,9 @@ curl -s -X POST "${BASE_URL}/api/staking/unstake" \
 
 ## 17. Reward CAP Guild
 
-**Triggers:** reward cap guild, reward cap xp, reward xp, distribute to guild, distribute to xp holders, guild reward, airdrop guild, airdrop xp holders
+**Triggers:** reward cap guild, distribute to guild, guild reward, airdrop guild
 
-Distribute tokens to all CAP Guild members (XP) proportionally based on their total points.
+Distribute tokens to all CAP Guild members proportionally based on their total points.
 
 ### Pre-Reward Flow (REQUIRED)
 
