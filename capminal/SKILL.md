@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.24.2
+version: 0.25.0
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking, cap-guild]
 ---
@@ -47,6 +47,18 @@ For table outputs, always return in standard markdown table format:
 | ------ | ------ | --- | ------ |
 | Row 1a | Row 1b | ... | Row 1n |
 ```
+
+## Pre-Action Checklist (applies to ALL write actions: Trade, Transfer, Deploy, Stake, Unstake, Reward)
+
+Before ANY action that moves tokens, ALWAYS:
+1. **Check wallet balance** — call Get Wallet Balance endpoint
+2. **Resolve token** — if user gives symbol (not address): check wallet `data.tokens[].symbol` first, then Common Addresses (see Reference Tables), then call Resolve Tokens API
+3. **Resolve balance** — if token not in wallet response, call Resolve Balance with the resolved address
+4. **Validate balance** — if insufficient: list alternative tokens with enough `usd_value` (don't just say "insufficient" and stop)
+5. **Handle $ amounts** — calculate: `tokenAmount = dollarAmount / usd_price`
+6. **Handle "all" / "100%"** — use `"100%"` string, NEVER copy balance number manually (precision loss causes errors)
+
+Individual sections below may add extra steps — follow both this checklist AND section-specific rules.
 
 ---
 
@@ -121,17 +133,11 @@ curl -s "${BASE_URL}/api/token/resolve-balance?addresses=0xabc...,0xdef..." \
 
 ### Pre-Deploy Check (REQUIRED)
 
-Deploying a token costs **0.0003 ETH** (+ `initialBuyAmount` if set). Before deploying, ALWAYS check wallet balance first:
-
-```bash
-curl -s -X GET "${BASE_URL}/api/wallet/balance" \
-  -H "x-cap-api-key: $CAP_API_KEY"
-```
-
-- Calculate required ETH: `0.0003 + initialBuyAmount`
+Follow **Pre-Action Checklist** above (step 1: check balance), plus:
+- Deploy costs **0.0003 ETH** (+ `initialBuyAmount` if set)
+- Calculate required: `0.0003 + initialBuyAmount`
 - Check ETH balance from `data.tokens[]` where `symbol` = "ETH"
-- If insufficient ETH, inform user: "Insufficient ETH balance. You need at least {required} ETH to deploy this token (0.0003 ETH deploy fee + {initialBuyAmount} ETH initial buy). Your current ETH balance is {balance}."
-- If sufficient, proceed with deploy.
+- If insufficient ETH: "You need at least {required} ETH (0.0003 fee + {initialBuyAmount} initial buy). Current: {balance}."
 
 ### Execute Deploy
 
@@ -158,46 +164,40 @@ curl -s -X POST "${BASE_URL}/api/orbs/createOrb" \
 
 ---
 
+## Order Type Disambiguation (CRITICAL — read before Swap/Limit/TWAP)
+
+| Signal in user message | Action | Section |
+|----------------------|--------|---------|
+| No conditions — "buy X", "sell X", "swap X for Y" | **Swap** (immediate, market price) | Section 4 |
+| Price target — "at $X", "when price reaches/drops to" | **Limit Order** (price-triggered) | Section 9 |
+| Time split — "over X days", "gradually", "every X hours", "DCA" | **TWAP** (time-weighted) | Section 12 |
+
+**Decision priority:**
+1. Explicit keyword wins: "twap", "limit order", "dca" → route directly
+2. Price condition ("at $X", "when it hits $X") → Limit Order
+3. Time-split condition ("over 3 days", "gradually", "every hour") → TWAP
+4. No conditions → Swap (immediate)
+5. Both price AND time → TWAP (use `allowedGain` for price protection)
+6. Ambiguous → ASK user: "Execute now (swap), at target price (limit order), or spread over time (TWAP)?"
+
+**Examples:**
+- "buy 1000 CAP" → Swap
+- "buy 1000 CAP at $0.05" → Limit Order
+- "sell CAP over 3 days" → TWAP
+- "gradually sell all CAP" → TWAP
+- "sell all CAP" → Swap
+- "DCA into ETH $100 every hour for a week" → TWAP
+
+---
+
 ## 4. Trade (Swap)
 
-**Triggers:** swap, trade, buy token, sell token, exchange
+**Triggers:** swap, trade, buy [now], sell [now], exchange, market buy, market sell
+**NOT when:** user specifies price target ("at $X", "when price reaches") or time split ("over X days", "gradually")
 
 ### Pre-Trade Flow (REQUIRED)
 
-**Before executing any trade, ALWAYS follow these steps:**
-
-**Step 1: Check wallet balance**
-```bash
-curl -s -X GET "${BASE_URL}/api/wallet/balance" \
-  -H "x-cap-api-key: $CAP_API_KEY"
-```
-
-**Step 2: Resolve token addresses and prices if needed**
-
-- If user provides a token **symbol** (not address), first check if it exists in the wallet balance response (`data.tokens[].symbol`).
-- If found in wallet: use `token_address` and `usd_price` from the balance response.
-- If NOT found in wallet: call Resolve Tokens API to get address and price, then call Resolve Balance with the resolved address to verify balance:
-  ```bash
-  curl -s "${BASE_URL}/api/token/resolve-tokens?symbols=SYMBOL" \
-    -H "x-cap-api-key: $CAP_API_KEY"
-  ```
-  ```bash
-  curl -s "${BASE_URL}/api/token/resolve-balance?addresses=0x..." \
-    -H "x-cap-api-key: $CAP_API_KEY"
-  ```
-
-**Step 3: Validate sufficient balance**
-
-Check if the sell token has enough balance to cover the trade (use wallet balance first, and resolve-balance result as fallback for tokens missing in wallet snapshot):
-- If sufficient: proceed to execute trade.
-- If insufficient: DO NOT just say "insufficient balance" and stop. Instead, automatically list all other tokens in the wallet that have enough `usd_value` to cover the requested amount, showing each token's symbol, available balance, and USD value. Let the user pick which one to use instead.
-
-**Step 4: Handle dollar ($) amounts**
-
-If user specifies amount in USD (e.g., "$50 worth of VIRTUAL", "buy $100 of ETH"):
-1. Get the token's `usd_price` from wallet balance or resolve-tokens response
-2. Calculate: `sellAmount = dollarAmount / usd_price`
-3. Use the calculated token amount as `sellAmount` in the trade request
+Follow **Pre-Action Checklist** above (check balance → resolve token → validate → handle $ amounts).
 
 ### Execute Trade
 
@@ -222,14 +222,7 @@ sellAmount | Yes      | Amount to sell (absolute e.g. "0.01", or percentage e.g.
 slippage   | No       | Basis points, default "1500" (15%)
 ```
 
-**Common Addresses:**
-```text
-Symbol | Address
-ETH    | 0x0000000000000000000000000000000000000000
-USDC   | 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
-```
-
-For any other symbol, resolve via wallet balance or Resolve Tokens API.
+See **Reference Tables** at the bottom for Common Token Addresses.
 
 **Response:** `data.transactionHash`, `data.inputAmount`, `data.inputSymbol`, `data.outputAmount`, `data.outputSymbol`. Show tx link: `https://basescan.org/tx/{hash}`
 
@@ -244,18 +237,12 @@ For any other symbol, resolve via wallet balance or Resolve Tokens API.
 
 ## 5. Transfer
 
-**Triggers:** transfer, send, send token, transfer token
+**Triggers:** transfer, send, send token, transfer token, burn, burn token, burn tokens
 
 ### Pre-Transfer Flow (REQUIRED)
 
-- Check wallet balance first (`/api/wallet/balance`).
-- Normalize recipient from user input:
-  - `0x...` EVM address
-  - Handle format: `@user`, `tg:user`, `fc:user`
-  - ENS domain ending with `.eth`
-- If user provides token symbol and it is not present in wallet balance, resolve symbol to address with Resolve Tokens.
-- If token address still has no balance data in wallet response, call Resolve Balance (`/api/token/resolve-balance`) for that address before deciding insufficient funds.
-- If still insufficient, report current available amount clearly and ask user to adjust transfer amount or token.
+Follow **Pre-Action Checklist** above, plus:
+- **Normalize recipient** from user input: `0x...` EVM address, handles (`@user`, `tg:user`, `fc:user`), or ENS `*.eth`
 
 ```bash
 curl -s -X POST "${BASE_URL}/api/orbs/transfer" \
@@ -272,9 +259,18 @@ curl -s -X POST "${BASE_URL}/api/orbs/transfer" \
 
 `toAddress` accepts recipient address, supported handles (`@`, `tg:`, `fc:`), or ENS (`*.eth`).
 
-Use Common Addresses table from Trade section for symbol-to-address conversion. For unknown symbols, use Resolve Tokens first, then Resolve Balance when wallet balance does not include that token.
+See **Reference Tables** for Common Token Addresses. For unknown symbols, use Resolve Tokens first, then Resolve Balance when wallet balance does not include that token.
 
 **Response:** `data.transactionHash`, `data.inputSymbol`, `data.inputAmount`, `data.inputAmountUsd`, `data.toAddress`. Show tx link: `https://basescan.org/tx/{hash}`
+
+### Burn Tokens
+
+**Triggers:** burn, burn token, burn tokens, destroy tokens
+
+When user asks to **burn** tokens, this is a transfer to the standard burn address:
+- `toAddress`: `0x000000000000000000000000000000000000dEaD` (see Reference Tables)
+- Follow the same Pre-Transfer flow (check balance, resolve token, validate)
+- **Confirm with user before executing:** "This will permanently burn {amount} {symbol}. Proceed?"
 
 ---
 
@@ -353,7 +349,7 @@ Use 2 decimals for `Amount USD` and US datetime format for `Expires`.
 
 ## 9. Create Limit Order
 
-**Triggers:** create limit order, place limit order, set buy limit, set sell limit
+**Triggers:** limit order, place limit order, buy at [price], sell at [price], buy when price reaches/drops to, set price trigger, conditional buy/sell
 
 ### Pre-Create Flow (REQUIRED)
 
@@ -430,7 +426,7 @@ Optional filters: `status` (`ACTIVE|COMPLETED|CANCELLED|EXPIRED|FAILED`), `order
 
 ## 12. Create TWAP Order
 
-**Triggers:** create twap, place twap, set twap order, twap buy, twap sell
+**Triggers:** twap, dca, dollar cost average, buy/sell over [time], gradually buy/sell, spread over time, buy/sell every [interval], scheduled buy/sell, drip buy
 
 ### Pre-Create Flow (REQUIRED)
 
@@ -503,15 +499,7 @@ curl -s -X GET "${BASE_URL}/api/staking/get" \
 
 ### Pre-Stake Check (REQUIRED)
 
-Before staking, ALWAYS check wallet balance:
-
-```bash
-curl -s -X GET "${BASE_URL}/api/wallet/balance" \
-  -H "x-cap-api-key: $CAP_API_KEY"
-```
-
-- Verify CAP token balance is sufficient to cover `amount`.
-- If insufficient: inform user of current CAP balance and stop.
+Follow **Pre-Action Checklist** above — verify CAP token balance is sufficient. If insufficient: inform user of current CAP balance and stop.
 
 ### Execute Stake
 
@@ -575,22 +563,7 @@ Distribute tokens to all CAP Guild members proportionally based on their total p
 
 ### Pre-Reward Flow (REQUIRED)
 
-Before distributing, ALWAYS follow these steps:
-
-**Step 1: Check wallet balance**
-```bash
-curl -s -X GET "${BASE_URL}/api/wallet/balance" \
-  -H "x-cap-api-key: $CAP_API_KEY"
-```
-
-- Verify the token to distribute has sufficient balance to cover `amount`.
-- If user provides a symbol, resolve to address using wallet balance or Resolve Tokens API.
-- If insufficient: inform user of current balance and stop.
-
-**Step 2: Resolve token address if needed**
-
-- If user provides a token **symbol** (not address), check wallet balance response (`data.tokens[].symbol`) — use `token_address`.
-- If NOT found in wallet: call Resolve Tokens API to get address.
+Follow **Pre-Action Checklist** above (check balance → resolve token → validate). If insufficient: inform user of current balance and stop.
 
 ### Execute Reward
 
@@ -618,3 +591,18 @@ amount       | Yes      | Total amount to distribute (token amount or percentage
 **Display as table:** `Transaction Hash | Amount | Token` (apply Table Format rule)
 
 **Response:** `data.transactionHash`. Show tx link: `https://basescan.org/tx/{hash}`
+
+---
+
+## Reference Tables
+
+### Common Token Addresses (Base chain)
+
+| Symbol | Address |
+|--------|---------|
+| ETH (native) | `0x0000000000000000000000000000000000000000` |
+| USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| CAP | `0xbfa733702305280F066D470afDFA784fA70e2649` |
+| Burn address | `0x000000000000000000000000000000000000dEaD` |
+
+For any other symbol, resolve via wallet balance or Resolve Tokens API.
