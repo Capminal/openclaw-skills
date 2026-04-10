@@ -1,7 +1,7 @@
 ---
 name: Capminal
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.25.1
+version: 0.26
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking, cap-guild]
 ---
@@ -591,6 +591,229 @@ amount       | Yes      | Total amount to distribute (token amount or percentage
 **Display as table:** `Transaction Hash | Amount | Token` (apply Table Format rule)
 
 **Response:** `data.transactionHash`. Show tx link: `https://basescan.org/tx/{hash}`
+
+---
+
+## 18. Check Token Risk (Wadjet)
+
+**Triggers:** check token, token check, rug check, is this safe, token risk, is it a rug, scan token, token safety, token audit, risk check, scam check, analyze token
+
+### Pre-Check Flow (REQUIRED when user provides symbol instead of address)
+
+If user provides a **symbol** (e.g., "check CAP", "is $VIRTUAL safe?") instead of a `0x...` address:
+
+1. Check **Common Token Addresses** (Reference Tables below) — if found, use that address directly
+2. Check wallet balance `data.tokens[].token_address` by matching symbol
+3. If not found in 1 or 2, **call Resolve Tokens API** to get the address:
+
+```bash
+curl -s "${BASE_URL}/api/token/resolve-tokens?symbols=CAP" \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+Extract `address` from the response, then use it as `token_address` in the Wadjet call below.
+
+4. If resolve returns no result: ask user for the contract address directly
+
+### Execute Check
+
+```bash
+curl -s -X POST "https://wadjet-production.up.railway.app/predict/agent" \
+  -H "Content-Type: application/json" \
+  -d '{"token_address": "0x..."}'
+```
+
+**No authentication needed** — Wadjet API is public. Do NOT set `x-cap-api-key` header for this call.
+
+**Example full flow (symbol → check):**
+1. User: "check CAP" → symbol = CAP
+2. Resolve: `GET ${BASE_URL}/api/token/resolve-tokens?symbols=CAP` → `address: "0xbfa733702305280F066D470afDFA784fA70e2649"`
+3. Check: `POST https://wadjet-production.up.railway.app/predict/agent` with `{"token_address": "0xbfa733702305280F066D470afDFA784fA70e2649"}`
+
+### Response Interpretation
+
+**Primary:** `rug_score` (0–100), `risk_level` (low/medium/high/critical), `behavior_class` (clean/suspicious/malicious), `confidence` (0–1), `summary`.
+
+**Security (`goplus_signals`) — RED FLAGS:**
+
+| Field | Critical if |
+|-------|------------|
+| `is_honeypot` | `true` — users CANNOT sell. **Lead with this warning.** |
+| `is_mintable` | `true` — owner can mint unlimited tokens |
+| `hidden_owner` | `true` — hidden contract ownership |
+| `can_take_back_ownership` | `true` — ownership can be reclaimed |
+| `slippage_modifiable` | `true` — owner can change slippage/tax |
+| `buy_tax` / `sell_tax` | `> 5%` — high taxes |
+| `is_open_source` | `false` — unverified contract |
+| `top10_holder_pct` | `> 0.5` = high concentration risk |
+| `lp_locked_pct` | `< 0.8` = liquidity not secured |
+| `creator_percent` / `owner_percent` | `> 0.05` = insider risk |
+
+**DEX (`dex_signals`):** `price_usd`, `price_change_24h`, `price_change_6h`, `volume_24h`, `liquidity_usd`, `market_cap`, `txns_24h_buys`/`txns_24h_sells`, `base_token`, `dex_id`.
+
+**ACP (`acp_signals`):** `trust_score` (0–100), `completion_rate`, `total_jobs`.
+
+**Risk warnings (`risk_signals[]`):** Array — each has `signal`, `severity` (low/medium/high), `detail`.
+
+### Display Format
+
+**Table 1 — Risk Overview & Security:**
+
+```markdown
+## Token Risk Report: {base_token} (`{token_address}`)
+
+**Risk: {risk_level} ({rug_score}%) | Behavior: {behavior_class} | Confidence: {confidence}**
+
+{summary}
+
+| Signal | Status |
+|--------|--------|
+| Honeypot | {is_honeypot} |
+| Mintable | {is_mintable} |
+| Hidden Owner | {hidden_owner} |
+| Open Source | {is_open_source} |
+| Buy Tax | {buy_tax}% |
+| Sell Tax | {sell_tax}% |
+| LP Locked | {lp_locked_pct * 100}% |
+| Top 10 Holders | {top10_holder_pct * 100}% |
+| Holders | {holder_count} |
+```
+
+**Table 2 — Market Data:**
+
+```markdown
+| Metric | Value |
+|--------|-------|
+| Price | ${price_usd} |
+| 24h Change | {price_change_24h}% |
+| Volume 24h | ${volume_24h} |
+| Liquidity | ${liquidity_usd} |
+| Market Cap | ${market_cap} |
+| Buys/Sells 24h | {txns_24h_buys}/{txns_24h_sells} |
+| DEX | {dex_id} |
+```
+
+Then list `risk_signals[]`: `- **[{severity}]** {signal}: {detail}`
+
+End with: `> This is an automated risk assessment, not financial advice. Always DYOR.`
+
+### Rules
+
+- If `is_honeypot` is `true`: **lead with HONEYPOT WARNING** before all other data
+- If `risk_level` is `high` or `critical`: use strong warning language
+- Never recommend buying or selling based solely on the risk check
+- If Wadjet API errors or is unreachable: inform user the risk check service is temporarily unavailable
+
+---
+
+## 19. Discover x402 API
+
+**Triggers:** discover x402, investigate x402, inspect x402, discover api, investigate api, x402 + URL
+
+Discover information about an x402-enabled API endpoint (pricing, supported methods, payment details) before calling it.
+
+### Pre-Discovery Validation
+
+User message MUST contain BOTH:
+1. A discovery keyword: `discover`, `investigate`, `inspect`
+2. A valid HTTPS URL (starting with `https://`)
+
+If either is missing, ask user to provide the complete command with URL.
+
+### Execute Discovery
+
+```bash
+curl -s -X GET "${BASE_URL}/api/actions/x402/discover?apiUrl=https://example.com/api/x402/endpoint" \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+**Required:** `apiUrl` (query parameter, must be valid HTTPS URL starting with `https://`).
+
+**Response:** JSON object containing x402 API metadata (pricing info, supported methods, required parameters, payment details).
+
+**Display:** Show heading "x402 API Discovery Result" followed by full JSON response in a `json` code block.
+
+### URL Extraction Rules
+
+- Extract HTTPS URL from user message
+- Common patterns:
+  - "discover x402 api https://..."
+  - "investigate api https://..."
+  - "discover https://..."
+  - "x402 https://..."
+- URL must start with `https://`
+- Extract complete URL including path and query parameters
+- Only process the latest message
+
+### Examples
+
+- "discover x402 api https://www.capminal.ai/api/x402/research" → `apiUrl=https://www.capminal.ai/api/x402/research`
+- "investigate x402 api https://pay.x402monopoly.com/api/x402/payment/player_to_player" → extract full URL
+- "investigate api https://example.com/api/endpoint" → extract URL after "api"
+- "inspect x402 https://api.example.com/x402/resource" → extract URL
+
+---
+
+## 20. Call x402 API
+
+**Triggers:** call x402, execute x402, call x402 api, execute x402 api
+
+Execute an x402 API call with a specific HTTP method and parameters. The system handles x402 payment automatically.
+
+### Pre-Call Validation
+
+User message MUST contain:
+1. A call keyword: `call x402`, `execute x402`
+2. A valid HTTPS URL (starting with `https://`)
+3. HTTP method (GET or POST) OR params — at least one must be present
+
+If URL is missing, ask user to provide it. If method is ambiguous, ask user.
+
+### Execute Call
+
+```bash
+curl -s -X POST "${BASE_URL}/api/actions/x402/call" \
+  -H "x-cap-api-key: $CAP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiUrl": "https://example.com/api/x402/endpoint",
+    "method": "GET",
+    "params": {"chainId": "8453", "tokenAddress": "0x..."}
+  }'
+```
+
+**Required:** `apiUrl` (HTTPS URL), `method` (GET or POST), `params` (JSON object, can be `{}`).
+
+**Response:** JSON data returned by the x402 API endpoint.
+
+**Display:** Show heading "x402 API Call Result" followed by full JSON response in a `json` code block.
+
+### Method Extraction Rules
+
+Look for method indicators in this priority order:
+1. `method: GET` or `method: POST` (with colon)
+2. `method GET` or `method POST` (without colon, space-separated)
+3. Standalone `GET` or `POST` after the URL and before `params`
+
+**Defaults:**
+- If method not specified but params are provided → default to `POST`
+- If method not specified and no params → default to `GET`
+- Always output as uppercase: `GET` or `POST`
+
+### Params Extraction Rules
+
+Look for params after `params:` keyword:
+- JSON string: `params: {"key": "value"}` → parse as JSON object
+- JSON object: `params: {key: value}` → parse as JSON
+- If no params provided → use empty object `{}`
+- Params must be a valid JSON object in the request body
+
+### Examples
+
+- "call x402 api https://www.capminal.ai/api/x402/research method: GET params: {\"chainId\": \"8453\", \"tokenAddress\": \"0x0b3e328455c4059eeb9e3f84b5543f74e24e7e1b\"}" → `apiUrl`: full URL, `method`: GET, `params`: parsed JSON
+- "execute x402 https://api.example.com/x402/endpoint method: POST params: {\"name\": \"test\", \"value\": 123}" → `apiUrl`: full URL, `method`: POST, `params`: parsed JSON
+- "call x402 api https://example.com/api/endpoint method GET" → `apiUrl`: full URL, `method`: GET, `params`: {}
+- "call x402 https://api.example.com/resource params: {\"query\": \"data\"}" → `apiUrl`: full URL, `method`: POST (default, params present), `params`: parsed JSON
 
 ---
 
