@@ -1,7 +1,7 @@
 ---
 name: cap-skill
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.26.0
+version: 0.26.2
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking, cap-guild]
 ---
@@ -208,8 +208,7 @@ curl -s -X POST "${BASE_URL}/api/orbs/trade" \
   -d '{
     "sellToken": "0x...",
     "buyToken": "0x...",
-    "sellAmount": "0.01",
-    "slippage": "1500"
+    "sellAmount": "0.01"
   }'
 ```
 
@@ -219,7 +218,6 @@ Parameter  | Required | Description
 sellToken  | Yes      | Token address to sell
 buyToken   | Yes      | Token address to buy
 sellAmount | Yes      | Amount to sell (absolute e.g. "0.01", or percentage e.g. "50%")
-slippage   | No       | Basis points, default "1500" (15%)
 ```
 
 See **Reference Tables** at the bottom for Common Token Addresses.
