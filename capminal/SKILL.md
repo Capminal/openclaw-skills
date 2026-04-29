@@ -1,9 +1,9 @@
 ---
 name: cap-skill
 description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.26.2
+version: 0.26.3
 author: AndreaPN
-tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking, cap-guild]
+tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking, cap-guild, slippage]
 ---
 
 # Capminal - Cap Wallet Integration
@@ -812,6 +812,43 @@ Look for params after `params:` keyword:
 - "execute x402 https://api.example.com/x402/endpoint method: POST params: {\"name\": \"test\", \"value\": 123}" → `apiUrl`: full URL, `method`: POST, `params`: parsed JSON
 - "call x402 api https://example.com/api/endpoint method GET" → `apiUrl`: full URL, `method`: GET, `params`: {}
 - "call x402 https://api.example.com/resource params: {\"query\": \"data\"}" → `apiUrl`: full URL, `method`: POST (default, params present), `params`: parsed JSON
+
+---
+
+## 21. Update Slippage
+
+**Triggers:** update slippage, set slippage, change slippage, slippage tolerance, slippage bps, configure slippage
+
+Update the user's swap slippage tolerance in basis points (bps). 100 bps = 1%. Range: 0–10000 (0%–100%).
+
+### Pre-Update Validation
+
+- `slippageBps` MUST be an integer between `0` and `10000`.
+- If user provides a percentage (e.g. "2%", "0.5%"), convert: `slippageBps = percent * 100` (e.g. 2% → 200, 0.5% → 50).
+- If user gives a value outside 0–10000 (or >100%), reject with: "Slippage must be between 0% and 100% (0–10000 bps)."
+- Warn the user before applying values **above 1500 bps (15%)**: "{value}% is high — swaps may execute at unfavorable prices. Confirm?"
+
+### Execute Update
+
+```bash
+curl -s -X POST "${BASE_URL}/api/wallet/updateSlippageBps" \
+  -H "Authorization: $AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "slippageBps": 100
+  }'
+```
+
+**Required:** `slippageBps` (integer, 0–10000).
+
+**Response:** `data.id`, `data.slippageBps`. Confirm to user: "Slippage updated to {slippageBps/100}% ({slippageBps} bps)."
+
+### Examples
+
+- "set slippage to 1%" → `slippageBps: 100`
+- "update slippage to 50 bps" → `slippageBps: 50`
+- "change slippage tolerance to 2.5%" → `slippageBps: 250`
+- "set slippage to 0" → `slippageBps: 0` (no slippage tolerated)
 
 ---
 
