@@ -1,6 +1,6 @@
 ---
 name: cap-skill
-description: OpenClaw agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
+description: CAP Skills agents can interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
 version: 0.26.3
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking, cap-guild, slippage]
