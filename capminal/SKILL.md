@@ -131,14 +131,6 @@ curl -s "${BASE_URL}/api/token/resolve-balance?addresses=0xabc...,0xdef..." \
 
 **Triggers:** deploy token, create token, launch token, clanker, orb
 
-### Pre-Deploy Check (REQUIRED)
-
-Follow **Pre-Action Checklist** above (step 1: check balance), plus:
-- Deploy costs **0.0003 ETH** (+ `initialBuyAmount` if set)
-- Calculate required: `0.0003 + initialBuyAmount`
-- Check ETH balance from `data.tokens[]` where `symbol` = "ETH"
-- If insufficient ETH: "You need at least {required} ETH (0.0003 fee + {initialBuyAmount} initial buy). Current: {balance}."
-
 ### Execute Deploy
 
 ```bash
