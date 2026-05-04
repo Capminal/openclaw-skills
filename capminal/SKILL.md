@@ -916,6 +916,8 @@ curl -s -X GET "${BASE_URL}/api/wallet/getUncollectedV4Rewards" \
 
 Display **all** entries — do not hide zero/empty rewards.
 
+**Exclude WETH:** filter out any row where `tokenAddress` equals `0x4200000000000000000000000000000000000006` (case-insensitive). Do not show it even if returned by the API.
+
 **Display as table:** `Token | Token Address` (apply Table Format rule)
 
 Row values: `{tokenSymbol}` | `{tokenAddress}` (pad columns using longest value).
