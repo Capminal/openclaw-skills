@@ -1,9 +1,9 @@
 ---
 name: cap-skill
 description: CAP Skills can help agents to interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.26.4
+version: 0.27.0
 author: AndreaPN
-tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking, cap-guild, slippage]
+tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking, cap-guild, slippage, transfer-owner]
 ---
 
 # Capminal - Cap Wallet Integration
@@ -849,6 +849,76 @@ curl -s -X POST "${BASE_URL}/api/wallet/updateSlippageBps" \
 - "update slippage to 50 bps" → `slippageBps: 50`
 - "change slippage tolerance to 2.5%" → `slippageBps: 250`
 - "set slippage to 0" → `slippageBps: 0` (no slippage tolerated)
+
+---
+
+## 22. Transfer Orb Ownership
+
+**Triggers:** transfer owner, transfer ownership, change owner, transfer orb owner, hand over orb, give orb to
+
+Transfer all 3 ownership roles (reward recipient, reward admin, admin) of a Clanker V4 orb to a new owner address. **Caller must currently be the owner — otherwise the API returns 403.**
+
+### Pre-Transfer Validation (REQUIRED)
+
+- `tokenAddress` MUST be a valid `0x...` Clanker V4 token address (40 hex chars after `0x`). If user gives a symbol, resolve it via Resolve Tokens API first (Section 2).
+- `newOwner` MUST be a valid `0x...` EVM address. ENS (`*.eth`) and `@handles` are NOT accepted by this endpoint.
+- Reject if either address is malformed.
+- **Confirm with user before executing:** "This will transfer reward recipient, reward admin, and admin of {tokenAddress} to {newOwner}. This is irreversible by you — only the new owner can transfer it back. Proceed?"
+
+### Execute Transfer
+
+```bash
+curl -s -X POST "${BASE_URL}/api/orbs/transferOrbOwner" \
+  -H "Authorization: $AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenAddress": "0xabc...abcd",
+    "newOwner": "0xa12...1234"
+  }'
+```
+
+**Required:** `tokenAddress`, `newOwner`.
+
+**Response:** `data.rewardRecipientTxHash`, `data.rewardAdminTxHash`, `data.adminTxHash`, `data.newOwner`, `data.tokenAddress`. Show all 3 tx links: `https://basescan.org/tx/{hash}`.
+
+**Display as table:** `Role | Tx Hash`
+
+| Role | Tx Hash |
+| ---- | ------- |
+| Reward Recipient | {rewardRecipientTxHash} |
+| Reward Admin | {rewardAdminTxHash} |
+| Admin | {adminTxHash} |
+
+### Error Handling
+
+- **403:** "You are not the current owner of this orb — only the owner can transfer ownership."
+- **400 / invalid address:** ask user to re-check the token or recipient address.
+
+### Examples
+
+- "Transfer owner of token 0xabc...abcd to 0xa12...1234" → `tokenAddress: 0xabc...abcd`, `newOwner: 0xa12...1234`
+- "Transfer my CAP orb ownership to 0xa12...1234" → resolve CAP via Resolve Tokens first, then call with resolved address.
+
+---
+
+## 23. Get Clanker Tokens
+
+**Triggers:** my clanker tokens, list clanker tokens, clanker tokens, my orbs, list orbs, deployed tokens, my tokens
+
+List ALL Clanker V4 tokens associated with the user's wallet. Same endpoint as Get Clanker Rewards (Section 6), but displays every entry — do NOT apply the `> 0` filter.
+
+```bash
+curl -s -X GET "${BASE_URL}/api/wallet/getUncollectedV4Rewards" \
+  -H "Authorization: $AUTH_TOKEN"
+```
+
+**Response contains:** `data[]` with `tokenAddress`, `tokenSymbol`, `tokenName`, `fee`, `poolId`, `imageUrl`.
+
+Display **all** entries — do not hide zero/empty rewards.
+
+**Display as table:** `Token | Token Address` (apply Table Format rule)
+
+Row values: `{tokenSymbol}` | `{tokenAddress}` (pad columns using longest value).
 
 ---
 
