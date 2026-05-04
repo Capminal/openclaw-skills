@@ -1,7 +1,7 @@
 ---
 name: cap-skill
 description: CAP Skills can help agents to interact with Cap Wallet, deploy Clanker tokens, claim rewards, and manage limit/TWAP orders
-version: 0.26.3
+version: 0.26.4
 author: AndreaPN
 tags: [capminal, cap-wallet, crypto, wallet, trading, clanker, limit-order, twap, orb, staking, cap-guild, slippage]
 ---
@@ -160,7 +160,7 @@ curl -s -X POST "${BASE_URL}/api/orbs/createOrb" \
 
 **Image handling:** If the user wants a token image, they must provide a public HTTPS URL (e.g., hosted on Imgur, Cloudflare, etc.). Pass it as `imageUrl` in the request body. If user sends an image attachment without providing a URL in text, ask them to upload it to a hosting service and share the direct link.
 
-**Response:** `data.transactionHash`, `data.poolId`, `data.tokenAddress`. Show Orb detail link: `https://www.capminal.ai/base/{tokenAddress}`
+**Response:** `data.transactionHash`, `data.poolId`, `data.tokenAddress`. Show 2 orb detail links: `https://www.capminal.ai/base/{tokenAddress}`, `https://www.clanker.world/clanker/{tokenAddress}`
 
 ---
 
