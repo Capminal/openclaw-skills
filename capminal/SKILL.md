@@ -1,7 +1,7 @@
 ---
 name: capminal
-description: CAP Skills can help agents to interact with Cap Wallet, deploy tokens via Clanker or Liquid, claim rewards, manage limit/TWAP/DCA orders, and discover/call x402 APIs
-version: 0.37.0
+description: CAP Skills can help agents to interact with Cap Wallet, deploy tokens via Clanker, Liquid or Virtuals, claim rewards, manage limit/TWAP/DCA orders, bridge tokens between Base and Robinhood, and discover/call x402 APIs
+version: 0.42.0
 author: AndreaPN
 tags:
   [
@@ -21,6 +21,7 @@ tags:
     slippage,
     transfer-owner,
     verify-orb,
+    bridge,
   ]
 allowed-actions: [http_request]
 memory-keys: [last-trade, last-deploy]
@@ -57,10 +58,10 @@ Before any request, resolve `CAP_API_KEY`:
 
 ## General Rules
 
-- Always wait for complete API response before answering
-- On 401: ask user to update key. On 429: wait and retry
+- Always wait for the complete API response before answering.
+- On 401: ask user to update key. On 429: wait and retry.
 - **URL query strings: use raw `&` as separator — NEVER HTML-encode it as `&amp;`.** Multi-param URLs must be exactly `?a=1&b=2`, not `?a=1&amp;b=2`.
-- **On ANY write-action failure (Swap, Deploy, Transfer, Claim Rewards):** the API returns `{ "success": false, "message": "...", "error": "..." }` or a non-2xx status. You MUST:
+- **On ANY write-action failure (Swap, Deploy, Transfer, Claim Rewards, Bridge):** the API returns `{ "success": false, "message": "...", "error": "..." }` or a non-2xx status. You MUST:
 
   1. NEVER post the success template for that action.
   2. NEVER fabricate a `transactionHash`, `tokenAddress`, `preLaunchTxHash`, `poolId`, basescan URL, or `capminal.ai/base/...` URL on a failure path.
@@ -82,7 +83,7 @@ Before any request, resolve `CAP_API_KEY`:
 
 ### Table Format (REQUIRED)
 
-For table outputs, always return in standard markdown table format:
+For table outputs, always return standard markdown tables:
 
 ```markdown
 | Col 1  | Col 2  | ... | Col n  |
@@ -94,14 +95,34 @@ For table outputs, always return in standard markdown table format:
 
 Before ANY action that moves tokens, ALWAYS:
 
-1. **Check wallet balance** — call Get Wallet Balance endpoint
-2. **Resolve token** — if user gives symbol (not address): check wallet `data.tokens[].symbol` first, then Common Addresses (see Reference Tables), then call Resolve Tokens API
-3. **Resolve balance** — if token not in wallet response, call Resolve Balance with the resolved address
-4. **Validate balance** — if insufficient: list alternative tokens with enough `usd_value` (don't just say "insufficient" and stop)
-5. **Handle $ amounts** — calculate: `tokenAmount = dollarAmount / usd_price`
-6. **Handle "all" / "100%"** — use `"100%"` string, NEVER copy balance number manually (precision loss causes errors)
+1. **Check wallet balance** — call Get Wallet Balance endpoint.
+2. **Resolve token** — if user gives a symbol (not address): check wallet `data.tokens[].symbol` first, then Common Addresses (Reference Tables), then call Resolve Tokens API.
+3. **Resolve balance** — if token not in wallet response, call Resolve Balance with the resolved address.
+4. **Validate balance** — if insufficient: list alternative tokens with enough `usd_value` (don't just say "insufficient" and stop).
+5. **Handle $ amounts** — calculate `tokenAmount = dollarAmount / usd_price`.
+6. **Handle "all" / "100%"** — use the string `"100%"`, NEVER copy a balance number manually (precision loss causes errors).
 
-Individual sections below may add extra steps — follow both this checklist AND section-specific rules.
+Chain-specific steps live in **Chain Registry** below. Individual sections may add extra steps — follow this checklist AND section-specific rules.
+
+---
+
+## Chain Registry
+
+Capminal runs on multiple chains. Everything chain-specific lives in this one table — **to add a chain, add a row.**
+
+| Chain | `chainId` | Native | WETH | Stable | Tx explorer | Deploy? | Resolvable symbols |
+| ------------------ | --------- | ------ | -------------------------------------------- | -------------------------------------------- | --------------------------------------- | ------- | ------------------ |
+| **Base** (default) | `8453`    | ETH `0x0000000000000000000000000000000000000000` | `0x4200000000000000000000000000000000000006` | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | `https://basescan.org`                  | Yes     | all                |
+| **Robinhood** (RH) | `4663`    | ETH    | `0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73` | USDG `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` | `https://robinhoodchain.blockscout.com` | No      | all    |
+
+**Rules:**
+
+- **Pick the chain** from the user's words: nothing / "Base" → Base (default); "Robinhood", "Robinhood chain", "RH", "on Robinhood" → Robinhood.
+- **`chainId` is a number** (`8453`, `4663`), never a string. Pass it on write actions that accept it (Trade, Transfer, Create Limit Order, Create TWAP, Create DCA) **and** as the `&chainId=` **query** param on read/resolve endpoints (Resolve Tokens, Resolve Addresses, Resolve Balance). Omitting it defaults to Base — resolving a non-Base token/price/balance without the right `chainId` returns Base data and the trade/read will be wrong.
+- **Addresses are per-chain** — a Base address does not exist on another chain. Use only the row's addresses (or one the user provides); never reuse the Base "Common Token Addresses" table for another chain.
+- **Symbol resolution follows the row's "Resolvable symbols".** If a chain's cell lists specific symbols (not `all`), any symbol outside that list returns an empty list → ask the user for the `0x` contract address; never fall back to another chain's address for the same symbol.
+- **Deploy** works only on chains marked **Deploy? = Yes** (Base). Never send another chain's `chainId` to Deploy.
+- **Tx links** use the row's Tx explorer (`https://basescan.org/tx/{hash}` for Base, `https://robinhoodchain.blockscout.com/tx/{hash}` for Robinhood).
 
 ---
 
@@ -114,6 +135,8 @@ curl -s -X GET "${BASE_URL}/api/wallet/balance" \
   -H "x-cap-api-key: $CAP_API_KEY"
 ```
 
+Chain-scoped — for non-Base chains, append `?chainId=` per **Chain Registry**. Example Robinhood: `${BASE_URL}/api/wallet/balance?chainId=4663`. Omitting it defaults to Base.
+
 **Response contains:** `data.address`, `data.balance` (total USD), and `data.tokens[]` with `symbol`, `token_address`, `balance_formatted`, `usd_price`, `usd_value` for each token.
 
 **Display as table:** `Token | Address | Amount | USD Value` (apply Table Format rule)
@@ -122,7 +145,7 @@ curl -s -X GET "${BASE_URL}/api/wallet/balance" \
 
 ## 2. Resolve Tokens
 
-Resolve token symbols to addresses (and basic metadata). Use when user input is symbol only, or when symbol is not found in wallet balance.
+Resolve token symbols to addresses (and basic metadata). Use when user input is symbol only, or when a symbol is not found in wallet balance.
 
 **Triggers:** resolve token, resolve symbol, token address from symbol
 
@@ -131,11 +154,13 @@ curl -s "${BASE_URL}/api/token/resolve-tokens?symbols=WETH,VIRTUAL,CAP" \
   -H "x-cap-api-key: $CAP_API_KEY"
 ```
 
+Chain-scoped — append `&chainId=` per **Chain Registry** for non-Base chains.
+
 **Response contains:** For each symbol: `chainId`, `address`, `symbol`, `name`, `decimals`, `priceUsd`.
 
 ### Resolve Addresses
 
-Resolve token **addresses** to market data. Use this when user asks for token price, market cap, FDV, pair age, or token market info.
+Resolve token **addresses** to market data. Use when user asks for token price, market cap, FDV, pair age, or token market info.
 
 **Triggers:** token info, token price, market cap, fdv, pair age, check token data
 
@@ -144,19 +169,17 @@ curl -s "${BASE_URL}/api/token/resolve-addresses?addresses=0xabc...,0xdef..." \
   -H "x-cap-api-key: $CAP_API_KEY"
 ```
 
+Chain-scoped — append `&chainId=` per **Chain Registry** for non-Base chains.
+
 **Response contains:** For each address: `priceUsd`, `symbol`, `name`, `address`, `fdv`, `marketCap`, `error`.
 
 **Display as table:** `Address | Symbol | Name | Price (USD) | Market Cap | FDV | Error` (apply Table Format rule)
 
-**Required flow for symbol-only input (IMPORTANT):**
-
-- If user asks token price/market cap/info but only gives **symbol** (no address), call `resolve-tokens` first to get address.
-- Then call `resolve-addresses` with the resolved address(es).
-- Do not stop at `resolve-tokens` when user intent is market info.
+**Required flow for symbol-only input (IMPORTANT):** if user asks token price/market cap/info but only gives a **symbol** (no address), call `resolve-tokens` first to get the address, then call `resolve-addresses` with it. Do not stop at `resolve-tokens` when user intent is market info.
 
 ### Resolve Balance
 
-Resolve balances by token addresses. Use this when wallet balance does not include the token you need to trade/transfer, or you want a direct balance check for specific addresses.
+Resolve balances by token addresses. Use when wallet balance does not include the token you need to trade/transfer, or you want a direct balance check for specific addresses.
 
 **Triggers:** resolve balance, token balance by address, check token amount
 
@@ -167,6 +190,7 @@ curl -s "${BASE_URL}/api/token/resolve-balance?addresses=0xabc...,0xdef..." \
 
 **Notes:**
 
+- Chain-scoped — append `&chainId=` per **Chain Registry** for non-Base chains (balance is read on-chain; without it a non-Base token's balance comes back as 0).
 - `resolve-balance` accepts token **addresses**. If user input is a symbol, resolve it with Resolve Tokens first.
 - Response includes per token: `address`, `name`, `decimals`, `balanceRaw`, `balance`, `error`.
 
@@ -176,7 +200,7 @@ curl -s "${BASE_URL}/api/token/resolve-balance?addresses=0xabc...,0xdef..." \
 
 **Triggers:** deploy token, create token, launch token, clanker, liquid, virtuals, virtual, orb
 
-Deploy a token via one of three launcher protocols. A single endpoint dispatches by the `launcher` field. Default `Liquid`.
+Deploy a token via one of three launcher protocols. A single endpoint dispatches by the `launcher` field. Default `Liquid`. **Deploy is Base-only** (see Chain Registry).
 
 | Launcher           | Protocol                      | Initial buy token | Notes                                         |
 | ------------------ | ----------------------------- | ----------------- | --------------------------------------------- |
@@ -229,38 +253,32 @@ curl -s -X POST "${BASE_URL}/api/orbs/createOrb" \
 
 ### `feeRecipient` parameter (all launchers)
 
-Optional. **Default = `null` (omit the field entirely).** Only include `feeRecipient` if the user **explicitly** mentions a fee recipient / fee handler / fee transfer in their prompt. Do NOT prompt the user for it, do NOT default it to yourself, do NOT guess.
+Optional. **Default = `null` (omit the field entirely).** Only include `feeRecipient` if the user **explicitly** mentions a fee recipient / fee handler / fee transfer. Do NOT prompt for it, do NOT default it to yourself, do NOT guess.
 
-When the user does specify one, accept either:
+When specified, accept either a `0x` EVM address (40 hex chars) or an X (Twitter) handle (≤15 alphanumeric, `@` prefix optional) — e.g. `"feeRecipient": "0xabc...1234"` or `"feeRecipient": "@Capminal"`.
 
-- `0x` EVM address (40 hex chars) — e.g. `"feeRecipient": "0xabc...1234"`, OR
-- X (Twitter) handle (≤15 alphanumeric, `@` prefix optional) — e.g. `"feeRecipient": "@Capminal"` or `"feeRecipient": "Capminal"`.
+If provided, the deployer pays for launch + initial buy, then ownership is **auto-transferred** to this recipient right after deploy. If transfer fails (handle unresolvable, RPC issue, etc.), the deploy still succeeds and the response sets `feeRecipientTransferError`. Leave empty to keep yourself as creator.
 
-If provided, the deployer pays for launch + initial buy, then ownership is **auto-transferred** to this recipient right after deploy. If transfer fails, the deploy still succeeds and `feeRecipientTransferError` is set. Leave empty to keep yourself as creator.
-
-**NLU mapping examples:**
-
-- "fee is on @Capminal" → `feeRecipient: "@Capminal"`
-- "fee recipient is 0xabc...1234" → `feeRecipient: "0xabc...1234"`
-- "transfer fee to @Capminal" → `feeRecipient: "@Capminal"`
-- "send fees to alice" → `feeRecipient: "alice"`
+**NLU examples:** "fee is on @Capminal" → `feeRecipient: "@Capminal"` · "fee recipient is 0xabc...1234" → `feeRecipient: "0xabc...1234"` · "send fees to alice" → `feeRecipient: "alice"`.
 
 ### Image handling
 
-If the user wants a token image, they must provide a public HTTPS URL (Imgur, Cloudflare, etc.). Pass it as `imageUrl` in the request body. If user sends an image attachment without providing a URL in text, ask them to upload it to a hosting service and share the direct link.
+If the user wants a token image, they must provide a public HTTPS URL (Imgur, Cloudflare, etc.). Pass it as `imageUrl`. If the user sends an image attachment without a URL in text, ask them to upload it to a hosting service and share the direct link.
 
 ### Response
 
 **Clanker / Liquid:** `data.transactionHash`, `data.poolId`, `data.tokenAddress`.
+
 **Virtuals:** `data.preLaunchTxHash`, `data.tokenAddress`, `data.pairAddress`, `data.virtualId`, `data.prototypeUrl`.
-**All launchers:** `data.feeRecipientTransfer` (object or `null`), `data.feeRecipientTransferError` (string or `null`).
+
+**All launchers:** `data.feeRecipientTransfer` (`{tokenAddress, newOwner, txHashes[]}` or `null` if not provided / self-transfer), `data.feeRecipientTransferError` (string or `null`).
 
 Show orb detail links:
 
 - Always: `https://www.capminal.ai/base/{tokenAddress}`
 - If `launcher` is `Liquid` (or omitted): `https://app.liquidprotocol.org/tokens/{tokenAddress}`
 - If `launcher` is `Clanker`: `https://www.clanker.world/clanker/{tokenAddress}`
-- If `launcher` is `Virtuals`: `{prototypeUrl}` from response.
+- If `launcher` is `Virtuals`: `{prototypeUrl}` from response (links to the Virtuals app prototype page).
 
 If `feeRecipientTransfer` is non-null, also note: "Ownership auto-transferred to {newOwner}." If `feeRecipientTransferError` is set, warn: "Deploy succeeded but ownership transfer failed: {error}. You can retry manually via Transfer Orb Ownership."
 
@@ -268,48 +286,34 @@ If `feeRecipientTransfer` is non-null, also note: "Ownership auto-transferred to
 
 ## Order Type Disambiguation (CRITICAL — read before Swap/Limit/TWAP/DCA)
 
-**DCA and TWAP are different products — do not confuse them:**
+Four products — do not confuse them:
 
-- **DCA** = a _recurring_ schedule on a calendar cadence (hourly / daily / weekly), a **fixed amount each run**, **no price condition**, can be **paused/resumed**, runs open-ended (or until an end date / execution cap). Use for "dollar cost average", "keep buying", "buy $X every day/week".
-- **TWAP** = split a **known total amount** across a **bounded window** in fixed intervals, **with price protection** (`allowedGain`), **cannot be paused**, finite. Use for "spread my X over Y", "sell all over 3 days".
+- **Swap** (§4) — immediate market buy/sell, no conditions.
+- **Limit Order** (§9) — price-triggered ("at $X", "when price reaches/drops to").
+- **DCA** (§21) — a _recurring_ schedule on a calendar cadence (hourly/daily/weekly), a **fixed amount each run**, **no price condition**, can be **paused/resumed**, runs open-ended (or until an end date / execution cap). Use for "dollar cost average", "keep buying", "buy $X every day/week".
+- **TWAP** (§12) — split a **known total amount** across a **bounded window** in fixed intervals, **with price protection** (`allowedGain`), **cannot be paused**, finite. Use for "spread my X over Y", "sell all over 3 days".
 
-| Signal in user message                                                                                      | Action                             | Section    |
-| ----------------------------------------------------------------------------------------------------------- | ---------------------------------- | ---------- |
-| No conditions — "buy X", "sell X", "swap X for Y"                                                           | **Swap** (immediate, market price) | Section 4  |
-| Price target — "at $X", "when price reaches/drops to"                                                       | **Limit Order** (price-triggered)  | Section 9  |
-| Recurring cadence — "DCA", "dollar cost average", "every day/week", "fixed $X each [period]", "keep buying" | **DCA** (recurring schedule)       | Section 21 |
-| Split a known total over a window — "spread my X over Y", "over X days", "sell all over 3 days"             | **TWAP** (time-weighted)           | Section 12 |
+**Decision priority (first match wins):**
 
-**Decision priority:**
+1. Explicit keyword: "twap" → TWAP; "dca"/"dollar cost average" → DCA; "limit order" → Limit.
+2. Price condition ("at $X", "when it hits $X") → Limit.
+3. Recurring calendar cadence ("every day", "weekly", "$X each hour", no defined total/end) → DCA.
+4. Known total over a bounded window ("spread my 1 ETH over 6h", "sell all over 3 days") → TWAP.
+5. No conditions → Swap.
+6. Ambiguous → ASK: "Execute now (swap), at target price (limit order), recurring buys (DCA), or spread a total over a window (TWAP)?"
 
-1. Explicit keyword wins: "twap" → TWAP; "dca"/"dollar cost average" → DCA; "limit order" → Limit
-2. Price condition ("at $X", "when it hits $X") → Limit Order
-3. Recurring calendar cadence ("every day", "weekly", "$X each hour", no defined total/end) → DCA
-4. Split a known total over a bounded window ("spread my 1 ETH over 6h", "sell all over 3 days") → TWAP
-5. No conditions → Swap (immediate)
-6. Ambiguous → ASK user: "Execute now (swap), at target price (limit order), recurring buys (DCA), or spread a total over a window (TWAP)?"
-
-**Examples:**
-
-- "buy 1000 CAP" → Swap
-- "buy 1000 CAP at $0.05" → Limit Order
-- "DCA $50 into ETH every day" → DCA
-- "buy $100 of CAP every hour" → DCA
-- "DCA into ETH $100 every hour for a week" → DCA (HOURLY, `intervalHours` derived, `expiresAt` = 1 week)
-- "spread 1 ETH buy over 6 hours" → TWAP
-- "sell CAP over 3 days" → TWAP
-- "sell all CAP" → Swap
+**Examples:** "buy 1000 CAP" → Swap · "buy 1000 CAP at $0.05" → Limit · "DCA $50 into ETH every day" / "buy $100 of CAP every hour" → DCA · "spread 1 ETH buy over 6 hours" / "sell CAP over 3 days" → TWAP · "sell all CAP" → Swap.
 
 ---
 
 ## 4. Trade (Swap)
 
 **Triggers:** swap, trade, buy [now], sell [now], exchange, market buy, market sell
-**NOT when:** user specifies price target ("at $X", "when price reaches") or time split ("over X days", "gradually")
+**NOT when:** user specifies a price target ("at $X", "when price reaches") or time split ("over X days", "gradually")
 
 ### Pre-Trade Flow (REQUIRED)
 
-Follow **Pre-Action Checklist** above (check balance → resolve token → validate → handle $ amounts).
+Follow the **Pre-Action Checklist** (check balance → resolve token → validate → handle $ amounts).
 
 ### Execute Trade
 
@@ -325,6 +329,8 @@ curl -s -X POST "${BASE_URL}/api/orbs/trade" \
   }'
 ```
 
+Chain-scoped — include `chainId` in the body per **Chain Registry**. For Robinhood trades, set `"chainId": 4663` instead of 8453.
+
 **Parameters:**
 
 ```text
@@ -332,12 +338,12 @@ Parameter  | Required | Description
 sellToken  | Yes      | Token address to sell
 buyToken   | Yes      | Token address to buy
 sellAmount | Yes      | Amount to sell (absolute e.g. "0.01", or percentage e.g. "50%")
-chainId    | No       | Chain ID (default 8453)
+chainId    | Yes      | Chain ID — 8453 (Base, default) or 4663 (Robinhood) per Chain Registry
 ```
 
-See **Reference Tables** at the bottom for Common Token Addresses.
+See **Reference Tables** for Common Token Addresses. **Sell all / max:** use `sellAmount: "100%"` (Pre-Action Checklist #6).
 
-**Response:** `data.transactionHash`, `data.inputAmount`, `data.inputSymbol`, `data.outputAmount`, `data.outputSymbol`. Show tx link: `https://basescan.org/tx/{hash}`
+**Response:** `data.transactionHash`, `data.inputAmount`, `data.inputSymbol`, `data.outputAmount`, `data.outputSymbol`. Show tx link using the selected chain's Tx explorer (**Chain Registry**) — `https://basescan.org/tx/{hash}` for Base, `https://robinhoodchain.blockscout.com/tx/{hash}` for Robinhood.
 
 ### Trade Examples
 
@@ -345,13 +351,6 @@ See **Reference Tables** at the bottom for Common Token Addresses.
 - **"Buy $50 of VIRTUAL"** → calculate ETH amount: 50 / eth_usd_price → sellToken=ETH, buyToken=VIRTUAL address, sellAmount=calculated
 - **"Sell 50% of my VIRTUAL for ETH"** → sellToken=VIRTUAL address (from balance), buyToken=ETH address, sellAmount="50%"
 - **"Swap $200 of ETH to USDC"** → ETH usd_price from balance → sellAmount = 200 / eth_usd_price → sellToken=ETH, buyToken=USDC address
-
-### Handling "sell all" / max amount
-
-When user asks to sell ALL of a token:
-
-- Use `sellAmount: "100%"` — the API supports percentage amounts
-- Do NOT copy the balance number manually — precision loss will cause "insufficient balance" errors
 
 ---
 
@@ -361,9 +360,9 @@ When user asks to sell ALL of a token:
 
 ### Pre-Transfer Flow (REQUIRED)
 
-Follow **Pre-Action Checklist** above, plus:
+Follow the **Pre-Action Checklist**, plus:
 
-- **Normalize recipient** from user input: `0x...` EVM address, handles (`@user`, `tg:user`, `fc:user`), or ENS `*.eth`
+- **Normalize recipient** from user input: `0x...` EVM address, handles (`@user`, `tg:user`, `fc:user`), or ENS `*.eth`.
 
 ```bash
 curl -s -X POST "${BASE_URL}/api/orbs/transfer" \
@@ -372,31 +371,30 @@ curl -s -X POST "${BASE_URL}/api/orbs/transfer" \
   -d '{
     "amount": "0.01",
     "toAddress": "0x...",
-    "tokenAddress": "0x0000000000000000000000000000000000000000"
+    "tokenAddress": "0x0000000000000000000000000000000000000000",
+    "chainId": 8453
   }'
 ```
 
-**Required:** `amount`, `toAddress`, `tokenAddress`.
+**Required:** `amount`, `toAddress`, `tokenAddress`. **Optional:** `chainId` (number, default `8453`; see Chain Registry).
 
-`toAddress` accepts recipient address, supported handles (`@`, `tg:`, `fc:`), or ENS (`*.eth`).
+`toAddress` accepts a recipient address, supported handles (`@`, `tg:`, `fc:`), or ENS (`*.eth`).
 
-See **Reference Tables** for Common Token Addresses. For unknown symbols, use Resolve Tokens first, then Resolve Balance when wallet balance does not include that token.
+See **Reference Tables** for Common Token Addresses. For unknown symbols, use Resolve Tokens first, then Resolve Balance when wallet balance does not include that token. **Send all / max:** use `amount: "100%"` (Pre-Action Checklist #6).
 
-**Response:** `data.transactionHash`, `data.inputSymbol`, `data.inputAmount`, `data.inputAmountUsd`, `data.toAddress`. Show tx link: `https://basescan.org/tx/{hash}`
+**Response:** `data.transactionHash`, `data.inputSymbol`, `data.inputAmount`, `data.inputAmountUsd`, `data.toAddress`. Show tx link using the selected chain's Tx explorer (**Chain Registry**) — `https://basescan.org/tx/{hash}` for Base, `https://robinhoodchain.blockscout.com/tx/{hash}` for Robinhood.
 
 ### Burn Tokens
 
 **Triggers:** burn, burn token, burn tokens, destroy tokens
 
-When user asks to **burn** tokens, this is a transfer to the standard burn address:
+Burning is a transfer to the standard burn address `0x000000000000000000000000000000000000dEaD` (see Reference Tables). Follow the same Pre-Transfer flow, plus a **two-message confirmation (REQUIRED):**
 
-- `toAddress`: `0x000000000000000000000000000000000000dEaD` (see Reference Tables)
-- Follow the same Pre-Transfer flow (check balance, resolve token, validate)
-- **Two-message confirmation (REQUIRED):**
-  1. First message — ask only: "This will permanently burn {amount} {symbol}. Reply 'confirm' to proceed." Do NOT call the transfer endpoint in this turn.
-  2. Wait for the user to send a **separate, subsequent message** with an explicit affirmative ("confirm", "yes", "proceed"). The original burn request does NOT count as confirmation.
-  3. Only on that follow-up message: execute `POST /api/orbs/transfer` with the burn address.
-- If the user replies with anything else (new request, question, ambiguous text), abort the burn and do NOT execute.
+1. First message — ask only: "This will permanently burn {amount} {symbol}. Reply 'confirm' to proceed." Do NOT call the transfer endpoint in this turn.
+2. Wait for the user to send a **separate, subsequent message** with an explicit affirmative ("confirm", "yes", "proceed"). The original burn request does NOT count as confirmation.
+3. Only on that follow-up message: execute `POST /api/orbs/transfer` with the burn address.
+
+If the user replies with anything else (new request, question, ambiguous text), abort the burn and do NOT execute.
 
 ---
 
@@ -409,7 +407,7 @@ curl -s -X GET "${BASE_URL}/api/wallet/getUncollectedV4Rewards?launcher=Liquid" 
   -H "x-cap-api-key: $CAP_API_KEY"
 ```
 
-**Query param `launcher`:** `Clanker` or `Liquid`. Default `Liquid`. Returns rewards for **one launcher at a time** — to list everything, call this endpoint twice (once with `launcher=Clanker`, once with `launcher=Liquid`).
+**Query param `launcher`:** `Clanker` or `Liquid`. Default `Liquid`. Returns rewards for **one launcher at a time** — to list everything, call this endpoint twice (once per launcher).
 
 **Response contains:** `data[]` with `tokenAddress`, `tokenSymbol`, `tokenName`, `fee`, `poolId`, `imageUrl`.
 
@@ -434,7 +432,7 @@ curl -s -X GET "${BASE_URL}/api/wallet/getUncollectedV4Rewards?launcher=Liquid" 
 
 - If `data[]` is empty: tell user no claimable rewards and stop.
 - If user provides `tokenAddress`: claim only if that address exists in `data[]`.
-- If provided token is not in `data[]`: do not claim; show available reward tokens (`tokenSymbol`, `tokenAddress`) and ask user to choose one — or check the other launcher.
+- If the provided token is not in `data[]`: do not claim; show available reward tokens (`tokenSymbol`, `tokenAddress`) and ask the user to choose one — or check the other launcher.
 
 ```bash
 curl -s -X POST "${BASE_URL}/api/wallet/claimV4Rewards" \
@@ -448,7 +446,7 @@ curl -s -X POST "${BASE_URL}/api/wallet/claimV4Rewards" \
 
 **Required:** `tokenAddress`. **Optional:** `launcher` (`Clanker` or `Liquid`, default `Liquid`).
 
-**Response:** `data.transactionHash`. Show tx link: `https://basescan.org/tx/{hash}`
+**Response:** `data.transactionHash`. Reward claiming is **Base-only** — show tx link: `https://basescan.org/tx/{hash}`
 
 ---
 
@@ -456,12 +454,14 @@ curl -s -X POST "${BASE_URL}/api/wallet/claimV4Rewards" \
 
 **Triggers:** limit orders, open orders, pending orders, list limit orders
 
-Default to `status=PENDING` unless user asks another status.
+Default to `status=PENDING` unless the user asks another status.
 
 ```bash
 curl -s -X GET "${BASE_URL}/api/cap-limit-order?status=PENDING" \
   -H "x-cap-api-key: $CAP_API_KEY"
 ```
+
+Chain-scoped — append `&chainId=` per **Chain Registry** to filter to a single chain (e.g. `&chainId=4663` for Robinhood only); omitting it lists orders across all chains.
 
 Optional filters: `status` (`PENDING|EXECUTING|COMPLETED|CANCELLED|EXPIRED|FAILED`), `orderType` (`BUY|SELL`).
 
@@ -482,15 +482,15 @@ Use 2 decimals for `Amount USD` and US datetime format for `Expires`.
 
 ### Pre-Create Flow (REQUIRED)
 
-- If `tokenAddress` or `expectedPrice` is unclear, resolve token first.
-- Check wallet balance tokens first (`/api/wallet/balance`) to map symbol -> `token_address` and `usd_price`.
+- If `tokenAddress` or `expectedPrice` is unclear, resolve the token first.
+- Check wallet balance tokens first (`/api/wallet/balance`) to map symbol → `token_address` and `usd_price`.
 - If still unclear, call Resolve Tokens API:
   ```bash
   curl -s "${BASE_URL}/api/token/resolve-tokens?symbols=SYMBOL" \
     -H "x-cap-api-key: $CAP_API_KEY"
   ```
 - Use resolved `address` as `tokenAddress`.
-- If user does not provide price, use resolved `usd_price` as `expectedPrice` and tell user before creating.
+- If the user does not provide a price, use resolved `usd_price` as `expectedPrice` and tell the user before creating.
 
 ```bash
 curl -s -X POST "${BASE_URL}/api/cap-limit-order" \
@@ -526,7 +526,7 @@ curl -s -X DELETE "${BASE_URL}/api/cap-limit-order/123" \
   -H "x-cap-api-key: $CAP_API_KEY"
 ```
 
-Replace `123` with actual order id.
+Replace `123` with the actual order id.
 
 **Response:** `data.id` (cancelled order id).
 
@@ -536,12 +536,14 @@ Replace `123` with actual order id.
 
 **Triggers:** twap orders, list twap, open twap, pending twap, twap list
 
-Default to `status=ACTIVE` unless user asks another status.
+Default to `status=ACTIVE` unless the user asks another status.
 
 ```bash
 curl -s -X GET "${BASE_URL}/api/twap?status=ACTIVE" \
   -H "x-cap-api-key: $CAP_API_KEY"
 ```
+
+Chain-scoped — append `&chainId=` per **Chain Registry** to filter to a single chain (e.g. `&chainId=4663` for Robinhood only); omitting it lists orders across all chains.
 
 Optional filters: `status` (`ACTIVE|COMPLETED|CANCELLED|EXPIRED|FAILED`), `orderType` (`BUY|SELL`).
 
@@ -561,8 +563,8 @@ Optional filters: `status` (`ACTIVE|COMPLETED|CANCELLED|EXPIRED|FAILED`), `order
 
 ### Pre-Create Flow (REQUIRED)
 
-- If user gives symbol instead of address, resolve token first from wallet balance (`/api/wallet/balance`) or Resolve Tokens API.
-- If `quoteTokenAddress` is missing, use native ETH address.
+- If user gives a symbol instead of an address, resolve the token first from wallet balance (`/api/wallet/balance`) or Resolve Tokens API.
+- If `quoteTokenAddress` is missing, use the native ETH address.
 - If `allowedGain` is missing, temporarily default to `"15"` (user can override later).
 - If `duration` is missing, temporarily default to `604800` (7 days).
 - If `intervalSeconds` is missing, temporarily default to `3600` (1 hour).
@@ -615,7 +617,7 @@ curl -s -X DELETE "${BASE_URL}/api/twap/123" \
   -H "x-cap-api-key: $CAP_API_KEY"
 ```
 
-Replace `123` with TWAP order id.
+Replace `123` with the TWAP order id.
 
 **Response:** `data.id` (cancelled TWAP order id).
 
@@ -625,41 +627,20 @@ Replace `123` with TWAP order id.
 
 **Triggers:** discover x402, investigate x402, inspect x402, what x402, x402 info, discover api, investigate api, x402 + URL
 
-Discover information about an x402-enabled API endpoint (pricing, supported methods, payment details) before calling it.
+Discover an x402-enabled API's metadata (pricing, supported methods, payment details) before calling it.
 
-### Pre-Discovery Validation
-
-- A discovery keyword is required: `discover`, `investigate`, `inspect`, `what x402`, `x402 info`
-- User MUST provide a valid HTTPS URL (starting with `https://`)
-- If no URL provided, reply: "Please specify the x402 API URL you want to discover (must start with `https://`)." Do NOT proceed.
-
-### Execute Discovery
+**Validation:** requires a discovery keyword (`discover`/`investigate`/`inspect`/`what x402`/`x402 info`) and a valid HTTPS URL (`https://`). Extract the complete URL (with path + query) from the latest message only. If no URL: reply "Please specify the x402 API URL you want to discover (must start with `https://`)." and stop.
 
 ```bash
 curl -s -X GET "${BASE_URL}/api/actions/x402/discover?apiUrl=https://www.capminal.ai/api/x402/research" \
   -H "x-cap-api-key: $CAP_API_KEY"
 ```
 
-**Required:** `apiUrl` (query parameter, must be valid HTTPS URL starting with `https://`).
+**Required:** `apiUrl` (query param, valid HTTPS URL).
 
-**Response:** JSON object containing x402 API metadata (pricing info, supported methods, required parameters, payment details).
+**Response:** JSON x402 API metadata (pricing, methods, required params, payment details). **Display:** heading "x402 API Discovery Result" + full JSON in a `json` code block.
 
-**Display:** Show heading "x402 API Discovery Result" followed by full JSON response in a `json` code block.
-
-### URL Extraction Rules
-
-- Extract HTTPS URL from user message (must start with `https://`)
-- Extract complete URL including path and query parameters
-- Common patterns:
-  - "discover x402 api https://..."
-  - "investigate api https://..."
-  - "x402 https://..."
-- Only process the latest message
-
-### Examples
-
-- "discover x402 api https://www.capminal.ai/api/x402/research" → `apiUrl=https://www.capminal.ai/api/x402/research`
-- "discover x402" → reply asking user to provide the URL
+**Examples:** "discover x402 api https://www.capminal.ai/api/x402/research" → `apiUrl=`that URL · "discover x402" → ask for the URL.
 
 ---
 
@@ -667,19 +648,9 @@ curl -s -X GET "${BASE_URL}/api/actions/x402/discover?apiUrl=https://www.capmina
 
 **Triggers:** call x402, execute x402, call x402 api, execute x402 api
 
-Execute an x402 API call with a specific HTTP method and parameters. The system handles x402 payment automatically.
+Execute an x402 API call with a method and params. The system handles x402 payment automatically.
 
-### Pre-Call Validation
-
-User message MUST contain:
-
-1. A call keyword: `call x402`, `execute x402`
-2. A valid HTTPS URL (starting with `https://`)
-3. HTTP method (GET or POST) OR params — at least one must be present
-
-If URL is missing, ask user to provide it. If method is ambiguous, ask user.
-
-### Execute Call
+**Validation:** user message MUST contain a call keyword (`call x402`/`execute x402`), a valid HTTPS URL, and (method OR params — at least one). If URL missing, ask for it; if method ambiguous, ask.
 
 ```bash
 curl -s -X POST "${BASE_URL}/api/actions/x402/call" \
@@ -694,39 +665,15 @@ curl -s -X POST "${BASE_URL}/api/actions/x402/call" \
 
 **Required:** `apiUrl` (HTTPS URL), `method` (GET or POST), `params` (JSON object, can be `{}`).
 
-**Response:** JSON data returned by the x402 API endpoint.
+**Method default:** params present but no method → `POST`; no method and no params → `GET`; always output uppercase.
+**Params:** parse the JSON after `params:` into an object; if none → `{}`.
 
-**Display:** Show heading "x402 API Call Result" followed by full JSON response in a `json` code block.
+**Response:** JSON returned by the x402 endpoint. **Display:** heading "x402 API Call Result" + full JSON in a `json` code block.
 
-### Method Extraction Rules
+**Examples:**
 
-Look for method indicators in this priority order:
-
-1. `method: GET` or `method: POST` (with colon)
-2. `method GET` or `method POST` (without colon, space-separated)
-3. Standalone `GET` or `POST` after the URL and before `params`
-
-**Defaults:**
-
-- If method not specified but params are provided → default to `POST`
-- If method not specified and no params → default to `GET`
-- Always output as uppercase: `GET` or `POST`
-
-### Params Extraction Rules
-
-Look for params after `params:` keyword:
-
-- JSON string: `params: {"key": "value"}` → parse as JSON object
-- JSON object: `params: {key: value}` → parse as JSON
-- If no params provided → use empty object `{}`
-- Params must be a valid JSON object in the request body
-
-### Examples
-
-- "call x402 api https://www.capminal.ai/api/x402/research method: GET params: {\"chainId\": \"8453\", \"tokenAddress\": \"0x0b3e328455c4059eeb9e3f84b5543f74e24e7e1b\"}" → `apiUrl`: full URL, `method`: GET, `params`: parsed JSON
-- "execute x402 https://api.example.com/x402/endpoint method: POST params: {\"name\": \"test\", \"value\": 123}" → `apiUrl`: full URL, `method`: POST, `params`: parsed JSON
-- "call x402 api https://example.com/api/endpoint method GET" → `apiUrl`: full URL, `method`: GET, `params`: {}
-- "call x402 https://api.example.com/resource params: {\"query\": \"data\"}" → `apiUrl`: full URL, `method`: POST (default, params present), `params`: parsed JSON
+- "call x402 api https://www.capminal.ai/api/x402/research method: GET params: {\"chainId\": \"8453\", \"tokenAddress\": \"0x0b3e...\"}" → `apiUrl`, `method`: GET, `params`: parsed JSON
+- "call x402 https://api.example.com/resource params: {\"query\": \"data\"}" → `apiUrl`, `method`: POST (default, params present), `params`: parsed JSON
 
 ---
 
@@ -739,9 +686,9 @@ Update the user's swap slippage tolerance in basis points (bps). 100 bps = 1%. R
 ### Pre-Update Validation
 
 - `slippageBps` MUST be an integer between `0` and `10000`.
-- If user provides a percentage (e.g. "2%", "0.5%"), convert: `slippageBps = percent * 100` (e.g. 2% → 200, 0.5% → 50).
-- If user gives a value outside 0–10000 (or >100%), reject with: "Slippage must be between 0% and 100% (0–10000 bps)."
-- Warn the user before applying values **above 1500 bps (15%)**: "{value}% is high — swaps may execute at unfavorable prices. Confirm?"
+- If the user provides a percentage (e.g. "2%", "0.5%"), convert: `slippageBps = percent * 100` (2% → 200, 0.5% → 50).
+- If the value is outside 0–10000 (or >100%), reject: "Slippage must be between 0% and 100% (0–10000 bps)."
+- Warn before applying values **above 1500 bps (15%)**: "{value}% is high — swaps may execute at unfavorable prices. Confirm?"
 
 ### Execute Update
 
@@ -756,14 +703,9 @@ curl -s -X POST "${BASE_URL}/api/wallet/updateSlippageBps" \
 
 **Required:** `slippageBps` (integer, 0–10000).
 
-**Response:** `data.id`, `data.slippageBps`. Confirm to user: "Slippage updated to {slippageBps/100}% ({slippageBps} bps)."
+**Response:** `data.id`, `data.slippageBps`. Confirm: "Slippage updated to {slippageBps/100}% ({slippageBps} bps)."
 
-### Examples
-
-- "set slippage to 1%" → `slippageBps: 100`
-- "update slippage to 50 bps" → `slippageBps: 50`
-- "change slippage tolerance to 2.5%" → `slippageBps: 250`
-- "set slippage to 0" → `slippageBps: 0` (no slippage tolerated)
+**Examples:** "set slippage to 1%" → `100` · "update slippage to 50 bps" → `50` · "change slippage tolerance to 2.5%" → `250` · "set slippage to 0" → `0`.
 
 ---
 
@@ -773,20 +715,19 @@ curl -s -X POST "${BASE_URL}/api/wallet/updateSlippageBps" \
 
 Transfer ownership of an orb to a new wallet. The single endpoint dispatches by `launcher`:
 
-| Launcher           | What gets transferred                            | # txs |
-| ------------------ | ------------------------------------------------ | ----- |
-| `Liquid` (default) | reward recipient + reward admin + admin (locker) | 3     |
-| `Clanker`          | reward recipient + reward admin + admin (locker) | 3     |
-| `Virtuals`         | AgentTaxV2 creator (fee recipient on BondingV5)  | 1     |
+| Launcher           | What gets transferred                                                             | # txs |
+| ------------------ | --------------------------------------------------------------------------------- | ----- |
+| `Liquid` (default) | reward recipient + reward admin + admin (on the launcher's fee-conversion locker) | 3     |
+| `Clanker`          | reward recipient + reward admin + admin (Clanker locker)                          | 3     |
+| `Virtuals`         | AgentTaxV2 creator (fee recipient on BondingV5)                                   | 1     |
 
-**Caller must currently be the owner — otherwise the API returns 403.** `launcher` must match the protocol that originally deployed the token. If unknown, read `gemSource` from `GET /api/orbs/market/{tokenAddress}` — it returns `Clanker`, `Liquid`, or `Virtuals`.
+**Caller must currently be the owner — otherwise the API returns 403.** `launcher` must match the protocol that originally deployed the token. If unknown, read `gemSource` from `GET /api/orbs/market/{tokenAddress}` (returns `Clanker`, `Liquid`, or `Virtuals`).
 
 ### Pre-Transfer Validation (REQUIRED)
 
-- `tokenAddress` MUST be a valid `0x...` token address (40 hex chars after `0x`). If user gives a symbol, resolve it via Resolve Tokens API first (Section 2).
-- Provide exactly one of `newOwner` (`0x` EVM address) OR `xHandle` (X username without `@`, 1–15 alphanumeric/underscore). ENS (`*.eth`) is NOT accepted.
-- Reject if neither/both are given or address is malformed.
-- **Confirm with user before executing:** "This will transfer ownership of {tokenAddress} ({launcher}) to {newOwner|@xHandle}. This is irreversible by you — only the new owner can transfer it back. Proceed?"
+- `tokenAddress` MUST be a valid `0x...` token address (40 hex chars after `0x`). If the user gives a symbol, resolve it via Resolve Tokens API first (Section 2).
+- `newOwner` MUST be a valid `0x...` EVM address OR provide `xHandle` instead (NOT both, NOT neither). ENS (`*.eth`) is NOT accepted. Reject if malformed and no xHandle is provided.
+- **Confirm before executing:** "This will transfer ownership of {tokenAddress} ({launcher}) to {newOwner|@xHandle}. This is irreversible by you — only the new owner can transfer it back. Proceed?"
 
 ### Execute Transfer — Clanker / Liquid
 
@@ -817,9 +758,11 @@ curl -s -X POST "${BASE_URL}/api/orbs/transferOrbOwner" \
 **Required:** `tokenAddress`, and exactly one of (`newOwner` | `xHandle`).
 **Optional:** `launcher` (`Clanker` | `Liquid` | `Virtuals`, default `Liquid`).
 
-**Response — Clanker/Liquid:** `data.rewardRecipientTxHash`, `data.rewardAdminTxHash`, `data.adminTxHash`, `data.newOwner`, `data.tokenAddress`. Show all 3 tx links: `https://basescan.org/tx/{hash}`.
+**Response — Clanker/Liquid:** `data.rewardRecipientTxHash`, `data.rewardAdminTxHash`, `data.adminTxHash`, `data.newOwner`, `data.tokenAddress`.
 
-**Response — Virtuals:** `data.updateCreatorTxHash`, `data.newOwner`, `data.tokenAddress`. Show 1 tx link.
+**Response — Virtuals:** `data.updateCreatorTxHash`, `data.newOwner`, `data.tokenAddress`.
+
+Orb ownership transfer is **Base-only** — show tx link(s): `https://basescan.org/tx/{hash}`.
 
 **Display as table — Clanker / Liquid:**
 
@@ -838,13 +781,13 @@ curl -s -X POST "${BASE_URL}/api/orbs/transferOrbOwner" \
 ### Error Handling
 
 - **403:** "You are not the current owner of this orb — only the owner can transfer ownership."
-- **400 / invalid address:** ask user to re-check the token or recipient address.
+- **400 / invalid address:** ask the user to re-check the token or recipient address.
 
 ### Examples
 
-- "Transfer owner of token 0xabc...abcd to 0xa12...1234" → `tokenAddress`, `newOwner`, `launcher` from market lookup.
-- "Transfer my Virtuals agent 0xabc... to @bob" → `tokenAddress`, `xHandle: "bob"`, `launcher: "Virtuals"`.
-- "Transfer my CAP orb ownership to 0xa12...1234" → resolve CAP via Resolve Tokens first, then call with resolved address.
+- "Transfer owner of token 0xabc...abcd to 0xa12...1234" → `tokenAddress: 0xabc...abcd`, `newOwner: 0xa12...1234`, `launcher: "Liquid"` (or read from market).
+- "Transfer my Virtuals agent 0xabc... to @bob" → `tokenAddress: 0xabc...`, `xHandle: "bob"`, `launcher: "Virtuals"`.
+- "Transfer my CAP orb ownership to 0xa12...1234" → resolve CAP via Resolve Tokens first, then call with the resolved address.
 
 ---
 
@@ -879,7 +822,7 @@ Check whether a token address was deployed via Capminal Orbs (Clanker or Liquid 
 
 ### Pre-Verify Flow (REQUIRED when user provides symbol instead of address)
 
-If the user provides a **symbol** (e.g. "verify CAP", "is $VIRTUAL a capminal orb?") instead of a `0x...` address:
+If the user provides a **symbol** (e.g., "verify CAP", "is $VIRTUAL a capminal orb?") instead of a `0x...` address:
 
 1. Check **Common Token Addresses** (Reference Tables below) — use that address directly if found.
 2. Check wallet balance `data.tokens[].token_address` by matching symbol.
@@ -899,13 +842,13 @@ curl -s -X GET "${BASE_URL}/api/orbs/verifyOrb?tokenAddress=0xabc...abcd" \
 
 ### Response Interpretation
 
-- If `data.isOrb` is `true`: confirm to the user **"Yes — this token was deployed by Capminal Orbs."** Include the token address AND the orb detail link `https://www.capminal.ai/base/{tokenAddress}`.
+- If `data.isOrb` is `true`: confirm **"Yes — this token was deployed by Capminal Orbs."** Include the token address AND the orb detail link `https://www.capminal.ai/base/{tokenAddress}`.
 - If `data.isOrb` is `false`: tell the user **"This token was NOT deployed by Capminal Orbs."** Do NOT include the capminal.ai link.
 - Do not invent extra metadata — this endpoint only returns the boolean.
 
 ### Display Format
 
-Short sentence followed by a small table (apply Table Format rule). When `isOrb` is `true`, append the orb detail link `https://www.capminal.ai/base/{tokenAddress}` after the table.
+Short sentence followed by a small table. When `isOrb` is `true`, append the orb detail link `https://www.capminal.ai/base/{tokenAddress}` after the table.
 
 ```markdown
 | Token Address  | Capminal Orb |
@@ -931,6 +874,8 @@ DCA orders run on a recurring schedule (hourly/daily/weekly). Default to `status
 curl -s -X GET "${BASE_URL}/api/dca/command?status=ACTIVE" \
   -H "x-cap-api-key: $CAP_API_KEY"
 ```
+
+Chain-scoped — append `&chainId=` per **Chain Registry** to filter to a single chain (e.g. `&chainId=4663` for Robinhood only); omitting it lists orders across all chains.
 
 Optional filters: `status` (`ACTIVE|PAUSED|COMPLETED|CANCELLED|EXPIRED|FAILED`), `dcaType` (`BUY|SELL`).
 
@@ -1012,6 +957,88 @@ Replace `123` with the DCA order id. Cancel works on any non-terminal order; pau
 
 ---
 
+## 23. Bridge Tokens (Base ⇄ Robinhood)
+
+**Triggers:** bridge, bridge tokens, bridge to Robinhood, bridge to Base, move ETH/USDC to Robinhood, move funds to Base, cross-chain transfer
+
+> **NOT a Swap.** Bridging moves the **same asset across chains** (ETH→ETH, USDC→USDG). A same-chain trade is Swap (§4). If the user wants to move tokens between Base and Robinhood, use Bridge.
+
+Bridges tokens between Base (`8453`) and Robinhood (`4663`) via Relay. **Only these routes are supported** (any other pair → `400 Unsupported route`):
+
+| Direction | `fromChainId` → `toChainId` | Asset | `fromToken` |
+| ------------------------------- | ------------- | ------------------- | ---------------------------------------------------------- |
+| **Base → Robinhood** (default)  | `8453` → `4663` | ETH→ETH / USDC→USDG | ETH `0x0000…0000`, USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| **Robinhood → Base**            | `4663` → `8453` | ETH→ETH / USDG→USDC | ETH `0x0000…0000`, USDG `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` |
+
+- Default direction is **Base → Robinhood**. For the reverse, you MUST pass `fromChainId: 4663` and `toChainId: 8453` explicitly.
+- `toToken` is optional — derived from the route. Only ETH and USDC/USDG bridge; for any other symbol, tell the user only ETH and USDC↔USDG are supported and stop.
+- `amount` is **human-readable** (e.g. `"0.05"` ETH, `"10"` USDC). For native ETH, leave a little ETH on the origin chain for gas.
+
+### Pre-Bridge Flow (REQUIRED)
+
+- Check wallet balance on the **origin** chain (chain-scoped — for a Robinhood origin, `?chainId=4663`; see Chain Registry).
+- Confirm the token is ETH or USDC/USDG and the balance covers `amount`.
+
+### Quote (optional preview)
+
+Use only when the user asks for a bridge quote/estimate.
+
+```bash
+curl -s -X POST "${BASE_URL}/api/bridge/quote" \
+  -H "x-cap-api-key: $CAP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fromToken": "0x0000000000000000000000000000000000000000",
+    "amount": "0.01",
+    "toChainId": 4663
+  }'
+```
+
+**Response:** `data.fromSymbol`, `data.toSymbol`, `data.expectedToAmountFormatted`, `data.feesUsd`, `data.rate`.
+
+### Execute Bridge
+
+```bash
+curl -s -X POST "${BASE_URL}/api/bridge/execute" \
+  -H "x-cap-api-key: $CAP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fromToken": "0x0000000000000000000000000000000000000000",
+    "amount": "0.01",
+    "fromChainId": 8453,
+    "toChainId": 4663
+  }'
+```
+
+**Required:** `fromToken`, `amount`. **Optional:** `fromChainId` (default `8453`), `toChainId` (default `4663`), `toToken` (derived from route).
+
+**Response:** `data.requestId`, `data.depositTxHash`, `data.status` (`"pending"`), `data.fromSymbol`, `data.toSymbol`, `data.fromAmountFormatted`, `data.expectedToAmountFormatted`, `data.feesUsd`, `data.explorerTxUrl`.
+
+The origin deposit tx is confirmed when this returns; the destination fill completes asynchronously (~seconds). Reply with:
+
+- A summary: `Bridged {fromAmountFormatted} {fromSymbol} → ~{expectedToAmountFormatted} {toSymbol} (fees ~${feesUsd}).`
+- The origin tx link via the origin chain's Tx explorer (**Chain Registry**) — `https://basescan.org/tx/{depositTxHash}` for Base origin, `https://robinhoodchain.blockscout.com/tx/{depositTxHash}` for Robinhood origin.
+- Note the destination fill completes in ~seconds, and give the `requestId` so the user can check status.
+
+### Check Bridge Status
+
+**Triggers:** bridge status, check bridge, did my bridge complete, bridge done
+
+```bash
+curl -s -X GET "${BASE_URL}/api/bridge/status/{requestId}" \
+  -H "x-cap-api-key: $CAP_API_KEY"
+```
+
+Replace `{requestId}` with the id from Execute.
+
+**Response:** `data.status` (`waiting|pending|success|failure`), `data.originTxHash`, `data.destinationTxHash`.
+
+- `success`: confirm the bridge completed; show the destination tx link (`https://robinhoodchain.blockscout.com/tx/{destinationTxHash}` for a Robinhood destination, `https://basescan.org/tx/{destinationTxHash}` for a Base destination).
+- `failure`: tell the user the bridge failed.
+- `waiting`/`pending`: still in flight — ask the user to check again in a few seconds.
+
+---
+
 ## Reference Tables
 
 ### Common Token Addresses (Base chain)
@@ -1026,4 +1053,4 @@ Replace `123` with the DCA order id. Cancel works on any non-terminal order; pau
 
 **ETH (native) and WETH are distinct tokens** — when the user says "ETH" use `0x0000000000000000000000000000000000000000`; when the user says "WETH" use `0x4200000000000000000000000000000000000006`. Never substitute one for the other (e.g. don't quote/buy a TWAP in native ETH when the user asked for WETH, and vice versa). If the wallet balance lists only one of them, resolve the other's balance explicitly via Resolve Balance before deciding it's unavailable.
 
-For any other symbol, resolve via wallet balance or Resolve Tokens API.
+For any other symbol, resolve via wallet balance or Resolve Tokens API. For non-Base chains, use the **Chain Registry** addresses.
