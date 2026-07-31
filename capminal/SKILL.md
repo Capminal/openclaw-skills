@@ -1,7 +1,7 @@
 ---
 name: capminal
 description: CAP Skills can help agents to interact with Cap Wallet, deploy tokens via Clanker, Liquid or Virtuals, claim rewards, manage limit/TWAP/DCA orders, bridge tokens between Base and Robinhood, and discover/call x402 APIs
-version: 0.42.0
+version: 0.42.1
 author: AndreaPN
 tags:
   [
@@ -61,6 +61,7 @@ Before any request, resolve `CAP_API_KEY`:
 - Always wait for the complete API response before answering.
 - On 401: ask user to update key. On 429: wait and retry.
 - **URL query strings: use raw `&` as separator — NEVER HTML-encode it as `&amp;`.** Multi-param URLs must be exactly `?a=1&b=2`, not `?a=1&amp;b=2`.
+- **NEVER use `~` in any user-facing reply.** A single `~` opens Markdown strikethrough, so two of them in one reply silently strike out everything between. For approximate values write `approx.` (e.g. `approx. 60s`), never `~60s`. The only permitted `~` is the home-dir path `~/cap_credentials.json`, and it must always stay inside backticks.
 - **On ANY write-action failure (Swap, Deploy, Transfer, Claim Rewards, Bridge):** the API returns `{ "success": false, "message": "...", "error": "..." }` or a non-2xx status. You MUST:
 
   1. NEVER post the success template for that action.
@@ -206,7 +207,7 @@ Deploy a token via one of three launcher protocols. A single endpoint dispatches
 | ------------------ | ----------------------------- | ----------------- | --------------------------------------------- |
 | `Liquid` (default) | Liquid Protocol (Clanker V4)  | ETH               | Hooked Uniswap V4 pool                        |
 | `Clanker`          | Clanker V4                    | ETH               | Hooked Uniswap V4 pool                        |
-| `Virtuals`         | Virtuals Protocol (BondingV5) | VIRTUAL           | preLaunch → indexer bot auto-launches in ~60s |
+| `Virtuals`         | Virtuals Protocol (BondingV5) | VIRTUAL           | preLaunch → indexer bot auto-launches in approx. 60s |
 
 ### Execute Deploy — Clanker / Liquid
 
@@ -1014,11 +1015,11 @@ curl -s -X POST "${BASE_URL}/api/bridge/execute" \
 
 **Response:** `data.requestId`, `data.depositTxHash`, `data.status` (`"pending"`), `data.fromSymbol`, `data.toSymbol`, `data.fromAmountFormatted`, `data.expectedToAmountFormatted`, `data.feesUsd`, `data.explorerTxUrl`.
 
-The origin deposit tx is confirmed when this returns; the destination fill completes asynchronously (~seconds). Reply with:
+The origin deposit tx is confirmed when this returns; the destination fill completes asynchronously (approx. a few seconds). Reply with:
 
-- A summary: `Bridged {fromAmountFormatted} {fromSymbol} → ~{expectedToAmountFormatted} {toSymbol} (fees ~${feesUsd}).`
+- A summary: `Bridged {fromAmountFormatted} {fromSymbol} → approx. {expectedToAmountFormatted} {toSymbol} (fees approx. ${feesUsd}).`
 - The origin tx link via the origin chain's Tx explorer (**Chain Registry**) — `https://basescan.org/tx/{depositTxHash}` for Base origin, `https://robinhoodchain.blockscout.com/tx/{depositTxHash}` for Robinhood origin.
-- Note the destination fill completes in ~seconds, and give the `requestId` so the user can check status.
+- Note the destination fill completes in a few seconds, and give the `requestId` so the user can check status.
 
 ### Check Bridge Status
 
