@@ -18,6 +18,16 @@ Skills are modular abilities that teach AI agents new capabilities. Each skill c
 
 ## Installation
 
+### Requirements
+
+Every skill here reads its credential from the **`CAP_API_KEY` environment variable** — there is no credentials file. Before installing:
+
+1. Generate a key at [capminal.ai/settings](https://www.capminal.ai/settings) (**API Key** tab).
+2. Set `CAP_API_KEY` in the environment of the agent host (AgentOS, Claude Code, a container, an SDK runtime), then restart the agent.
+3. Install [`capminal`](./capminal) first — `contract-interaction` and `morse-launch-b20` act on the Cap Wallet it sets up, and share the same key.
+
+Each skill declares this requirement in its `SKILL.md` frontmatter, so hosts that gate on missing credentials will show it as needing setup until the variable is present.
+
 ### Manual Installation
 ```bash
 git clone https://github.com/Capminal/agent-skills.git

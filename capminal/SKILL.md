@@ -1,7 +1,7 @@
 ---
 name: capminal
 description: CAP Skills can help agents to interact with Cap Wallet, deploy tokens via Clanker, Liquid or Virtuals, claim rewards, manage limit/TWAP/DCA orders, bridge tokens between Base and Robinhood, and discover/call x402 APIs
-version: 0.42.1
+version: 0.43.0
 author: AndreaPN
 tags:
   [
@@ -25,6 +25,16 @@ tags:
   ]
 allowed-actions: [http_request]
 memory-keys: [last-trade, last-deploy]
+metadata:
+  agentos:
+    primaryEnv: CAP_API_KEY
+    homepage: https://www.capminal.ai/settings
+    requires:
+      env:
+        - name: CAP_API_KEY
+          description: Capminal API key — authorizes Cap Wallet reads and writes (swaps, transfers, deploys, reward claims, bridges)
+          url: https://www.capminal.ai/settings
+          secret: true
 ---
 
 # Capminal - Cap Wallet Integration
@@ -33,6 +43,29 @@ memory-keys: [last-trade, last-deploy]
 
 ```
 BASE_URL = https://api.capminal.ai
+```
+
+## Required Environment Variables
+
+To install this skill into an agent host — AgentOS, Claude Code, an SDK agent, a container — the host must expose this variable to the agent **process** before the skill runs. The skill declares it in frontmatter (`metadata.agentos.requires.env`), so a host that supports requirement gating will mark the skill **Setup required** until it is set.
+
+| Variable | Required | Value | Notes |
+| -------------- | -------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `CAP_API_KEY`  | **Yes**  | Your Capminal API key from https://www.capminal.ai/settings (**API Key** tab)   | Authorizes real wallet writes — swaps, transfers, deploys, reward claims, bridges. Treat it as a spending credential.    |
+
+No other variables exist. `BASE_URL` is fixed at `https://api.capminal.ai` and must not be overridden by configuration.
+
+### Setting it per host
+
+- **AgentOS / hosted agent platforms** — set `CAP_API_KEY` in the agent's environment-variable or secrets configuration, at the agent or deployment level, so it is present in the agent process before the skill is invoked. Never per-conversation, and never inside a prompt or system message.
+- **POSIX shell** — `export CAP_API_KEY=...` in the shell profile that launches the agent. Typing it inline puts the value in shell history, so edit the profile (or use the host's secret store) instead of pasting it at a prompt.
+- **`.env` file / container** — `CAP_API_KEY=...` in a gitignored `.env`, or `docker run -e CAP_API_KEY ...` / a Compose `environment:` entry sourced from a secret. Never bake the value into an image or commit it.
+- **Claude Code** — an `env` block in `$HOME/.claude/settings.json`.
+
+After setting it, restart the agent so the process picks up the new environment, then confirm without revealing the value:
+
+```bash
+[ -n "$CAP_API_KEY" ] && echo "CAP_API_KEY loaded"
 ```
 
 ## Authentication & Security
@@ -47,21 +80,26 @@ BASE_URL = https://api.capminal.ai
 
 ### API Key Resolution
 
-Before any request, resolve `CAP_API_KEY`:
+`CAP_API_KEY` is read from the **environment only**. This skill has no credentials file.
 
-1. Read `~/cap_credentials.json` -> `{"CAP_API_KEY": "your-key"}`
-2. Fall back to `CAP_API_KEY` environment variable
-3. If not found, ask user to generate at https://www.capminal.ai/settings, tab API Key.
+1. Read the `CAP_API_KEY` environment variable.
+2. If it is unset or empty — **stop**. Do not read, create, or search for any credentials file, and do not ask the user to paste the key into the chat. Tell the user to set `CAP_API_KEY` in the agent host's environment (see **Required Environment Variables** in the `capminal` skill) and restart the agent.
 
-**Save key:** `echo '{"CAP_API_KEY": "KEY"}' > ~/cap_credentials.json`
-**Revoke key:** `rm -f ~/cap_credentials.json`
+**Rules:**
+
+- NEVER write the key to a file, a shell command, a committed config, or anywhere it lands in shell history.
+- To confirm it is present without revealing it: `[ -n "$CAP_API_KEY" ] && echo "CAP_API_KEY loaded"`.
+- **Get a key:** https://www.capminal.ai/settings -> **API Key** tab.
+- **Revoke a key:** revoke it at https://www.capminal.ai/settings -> **API Key** tab. Server-side revocation is the ONLY thing that invalidates a leaked key — unsetting the environment variable or deleting a local file does not.
+- **Rotate:** rotate periodically, and immediately if the value was ever echoed, logged, pasted into a chat, or committed. Rotating = issue a new key at Settings, update the environment variable, restart the agent, then revoke the old key.
+- **Migrating from a credentials file:** earlier versions of this skill stored the key in plaintext at `$HOME/cap_credentials.json`. If that file exists: copy the value into the `CAP_API_KEY` environment variable, delete the file with `rm -f "$HOME/cap_credentials.json"`, then — because a plaintext key may already have been backed up or read by another process — revoke that key at Settings and switch to a fresh one.
 
 ## General Rules
 
 - Always wait for the complete API response before answering.
 - On 401: ask user to update key. On 429: wait and retry.
 - **URL query strings: use raw `&` as separator — NEVER HTML-encode it as `&amp;`.** Multi-param URLs must be exactly `?a=1&b=2`, not `?a=1&amp;b=2`.
-- **NEVER use `~` in any user-facing reply.** A single `~` opens Markdown strikethrough, so two of them in one reply silently strike out everything between. For approximate values write `approx.` (e.g. `approx. 60s`), never `~60s`. The only permitted `~` is the home-dir path `~/cap_credentials.json`, and it must always stay inside backticks.
+- **NEVER use `~` in any user-facing reply.** A single `~` opens Markdown strikethrough, so two of them in one reply silently strike out everything between. For approximate values write `approx.` (e.g. `approx. 60s`), never `~60s`. There is no exception — write `$HOME/...` for home-directory paths, never `~/...`.
 - **On ANY write-action failure (Swap, Deploy, Transfer, Claim Rewards, Bridge):** the API returns `{ "success": false, "message": "...", "error": "..." }` or a non-2xx status. You MUST:
 
   1. NEVER post the success template for that action.
