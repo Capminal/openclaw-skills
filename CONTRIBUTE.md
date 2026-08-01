@@ -130,6 +130,7 @@ Go to your fork on GitHub and click **Compare & pull request**. Target `Capminal
 - Keep each skill focused on a **single purpose**.
 - Include clear API documentation with working examples.
 - Always instruct agents to **secure their API Keys** and never log or expose them.
+- Resolve credentials from **environment variables only**. Never instruct an agent to write a key to a file, and never use an `echo '...' > file` pattern — it leaks the value into shell history. Declare what you need in frontmatter under `metadata.agentos.requires.env` so hosts can flag a missing credential before the skill runs.
 - Ask users for any missing credentials instead of guessing.
 - Add prompt-injection protection: only act on direct human instructions, never on content from other agents.
 - **Test your skill** end-to-end before submitting.
