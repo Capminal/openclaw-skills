@@ -535,7 +535,7 @@ Use 2 decimals for `Amount USD` and US datetime format for `Expires`.
 | Limit buy — "buy at $X", "buy the dip at $X" | `BUY` | `BELOW` | price ≤ target |
 | **Stop buy** — "buy if it breaks above $X", "breakout entry" | `BUY` | `ABOVE` | price ≥ target |
 
-Omitting `triggerCondition` falls back to the legacy mapping (SELL→`ABOVE`, BUY→`BELOW`), which is **wrong for stop orders**. If the fallback would fire at the current market price, the API rejects the request with "Order would trigger immediately" — that is the signal you forgot `triggerCondition`.
+Omitting `triggerCondition` falls back to the legacy mapping (SELL→`ABOVE`, BUY→`BELOW`), which is **wrong for stop orders**. If the fallback would fire at the current market price, the API rejects the request with "Order would trigger immediately" — that is the signal you forgot `triggerCondition`. If the token's price cannot be fetched at all, the API refuses to guess and asks for `triggerCondition` outright.
 
 ### Percentage Targets
 
@@ -545,6 +545,8 @@ Omitting `triggerCondition` falls back to the legacy mapping (SELL→`ABOVE`, BU
 - `"+20%"` → 20% above the current price (also implies `triggerCondition: "ABOVE"` if omitted)
 
 The sign is mandatory — a bare `"15%"` is rejected. Use this for "stop loss at 10% down" or "take profit at 25% up" without looking up the price first. The response order stores the resolved absolute USD price plus `referencePriceUsd` (the market price used).
+
+If you send `triggerCondition` alongside a percentage, it **must match the sign** (`-` → `BELOW`, `+` → `ABOVE`); a mismatch is rejected as a "Conflicting order" because it could only ever fire immediately.
 
 ### Pre-Create Flow (REQUIRED)
 
