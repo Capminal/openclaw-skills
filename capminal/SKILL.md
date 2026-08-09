@@ -1,7 +1,7 @@
 ---
 name: capminal
-description: CAP Skills can help agents to interact with Cap Wallet, deploy tokens via Clanker, Liquid or Virtuals, claim rewards, manage limit/TWAP/DCA orders, bridge tokens between Base and Robinhood, and discover/call x402 APIs
-version: 0.43.0
+description: CAP Skills can help agents to interact with Cap Wallet, deploy tokens via Clanker, Liquid or Virtuals, claim rewards, manage limit/stop-loss/TWAP/DCA orders, bridge tokens between Base and Robinhood, and discover/call x402 APIs
+version: 0.44.0
 author: AndreaPN
 tags:
   [
@@ -14,6 +14,7 @@ tags:
     liquid,
     launcher,
     limit-order,
+    stop-loss,
     twap,
     dca,
     orb,
@@ -328,20 +329,20 @@ If `feeRecipientTransfer` is non-null, also note: "Ownership auto-transferred to
 Four products — do not confuse them:
 
 - **Swap** (§4) — immediate market buy/sell, no conditions.
-- **Limit Order** (§9) — price-triggered ("at $X", "when price reaches/drops to").
+- **Limit Order** (§9) — price-triggered ("at $X", "when price reaches/drops to"). Covers **stop losses and stop buys** too, via `triggerCondition` — there is no separate stop-order product.
 - **DCA** (§21) — a _recurring_ schedule on a calendar cadence (hourly/daily/weekly), a **fixed amount each run**, **no price condition**, can be **paused/resumed**, runs open-ended (or until an end date / execution cap). Use for "dollar cost average", "keep buying", "buy $X every day/week".
 - **TWAP** (§12) — split a **known total amount** across a **bounded window** in fixed intervals, **with price protection** (`allowedGain`), **cannot be paused**, finite. Use for "spread my X over Y", "sell all over 3 days".
 
 **Decision priority (first match wins):**
 
-1. Explicit keyword: "twap" → TWAP; "dca"/"dollar cost average" → DCA; "limit order" → Limit.
-2. Price condition ("at $X", "when it hits $X") → Limit.
+1. Explicit keyword: "twap" → TWAP; "dca"/"dollar cost average" → DCA; "limit order"/"stop loss"/"stop order"/"take profit" → Limit.
+2. Price condition ("at $X", "when it hits $X", "if it drops below $X", "if it breaks above $X") → Limit. Then pick `triggerCondition` from the Strategy Matrix in §9 — "drops below" and "cut losses" mean `BELOW`, "rises to" and "breaks above" mean `ABOVE`.
 3. Recurring calendar cadence ("every day", "weekly", "$X each hour", no defined total/end) → DCA.
 4. Known total over a bounded window ("spread my 1 ETH over 6h", "sell all over 3 days") → TWAP.
 5. No conditions → Swap.
 6. Ambiguous → ASK: "Execute now (swap), at target price (limit order), recurring buys (DCA), or spread a total over a window (TWAP)?"
 
-**Examples:** "buy 1000 CAP" → Swap · "buy 1000 CAP at $0.05" → Limit · "DCA $50 into ETH every day" / "buy $100 of CAP every hour" → DCA · "spread 1 ETH buy over 6 hours" / "sell CAP over 3 days" → TWAP · "sell all CAP" → Swap.
+**Examples:** "buy 1000 CAP" → Swap · "buy 1000 CAP at $0.05" → Limit (BUY/BELOW) · "sell my CAP if it drops below $0.05" → Limit (SELL/**BELOW** — stop loss) · "sell my CAP at $0.20" → Limit (SELL/ABOVE) · "buy CAP if it breaks above $0.30" → Limit (BUY/**ABOVE** — stop buy) · "stop loss 10% down on CAP" → Limit (SELL/BELOW, `expectedPrice: "-10%"`) · "DCA $50 into ETH every day" / "buy $100 of CAP every hour" → DCA · "spread 1 ETH buy over 6 hours" / "sell CAP over 3 days" → TWAP · "sell all CAP" → Swap.
 
 ---
 
@@ -502,14 +503,18 @@ curl -s -X GET "${BASE_URL}/api/cap-limit-order?status=PENDING" \
 
 Chain-scoped — append `&chainId=` per **Chain Registry** to filter to a single chain (e.g. `&chainId=4663` for Robinhood only); omitting it lists orders across all chains.
 
-Optional filters: `status` (`PENDING|EXECUTING|COMPLETED|CANCELLED|EXPIRED|FAILED`), `orderType` (`BUY|SELL`).
+Optional filters: `status` (`PENDING|EXECUTING|COMPLETED|CANCELLED|EXPIRED|FAILED`), `orderType` (`BUY|SELL`), `triggerCondition` (`ABOVE|BELOW`).
 
-**Response contains:** `data[]` orders with fields like `id`, `status`, `orderType`, `tokenSymbol`, `quoteTokenSymbol`, `tokenAmount`, `expectedPrice`, `expiresAt`.
+To list only stop losses, combine both: `?status=PENDING&orderType=SELL&triggerCondition=BELOW`.
 
-**Display as table:** `Order ID | Status | Type | Token | Quote Token | Amount | Price (USD) | Amount USD | Expires`
+**Response contains:** `data[]` orders with fields like `id`, `status`, `orderType`, `triggerCondition`, `tokenSymbol`, `quoteTokenSymbol`, `tokenAmount`, `expectedPrice`, `expiresAt`.
+
+**Display as table:** `Order ID | Status | Strategy | Token | Quote Token | Amount | Trigger Price (USD) | Amount USD | Expires`
 
 Row values:
-`{id}` | `{status}` | `{orderType}` | `{tokenSymbol}` | `{quoteTokenSymbol}` | `{tokenAmount} {tokenSymbol}` | `{expectedPrice}` | `${tokenAmount * expectedPrice}` | `{expiresAt}` (pad columns using longest value)
+`{id}` | `{status}` | `{strategy}` | `{tokenSymbol}` | `{quoteTokenSymbol}` | `{tokenAmount} {tokenSymbol}` | `{expectedPrice}` | `${tokenAmount * expectedPrice}` | `{expiresAt}` (pad columns using longest value)
+
+Derive `{strategy}` from `orderType` + `triggerCondition` using the table in §9. When `triggerCondition` is absent (orders created before stop orders existed), treat SELL as `ABOVE` and BUY as `BELOW`.
 
 Use 2 decimals for `Amount USD` and US datetime format for `Expires`.
 
@@ -517,7 +522,31 @@ Use 2 decimals for `Amount USD` and US datetime format for `Expires`.
 
 ## 9. Create Limit Order
 
-**Triggers:** limit order, place limit order, buy at [price], sell at [price], buy when price reaches/drops to, set price trigger, conditional buy/sell
+**Triggers:** limit order, place limit order, buy at [price], sell at [price], buy when price reaches/drops to, set price trigger, conditional buy/sell, stop loss, stop order, cut losses, sell if it drops below [price], protect my position, take profit, stop buy, breakout buy, buy if it breaks above [price]
+
+### Strategy Matrix (REQUIRED — pick `triggerCondition` before creating)
+
+`orderType` says buy or sell; `triggerCondition` says which side of the target fires it. Always send **both**.
+
+| User intent | `orderType` | `triggerCondition` | Fires when |
+| --- | --- | --- | --- |
+| Take profit — "sell at $X", "sell when it hits $X" | `SELL` | `ABOVE` | price ≥ target |
+| **Stop loss** — "sell if it drops below $X", "cut losses at $X" | `SELL` | `BELOW` | price ≤ target |
+| Limit buy — "buy at $X", "buy the dip at $X" | `BUY` | `BELOW` | price ≤ target |
+| **Stop buy** — "buy if it breaks above $X", "breakout entry" | `BUY` | `ABOVE` | price ≥ target |
+
+Omitting `triggerCondition` falls back to the legacy mapping (SELL→`ABOVE`, BUY→`BELOW`), which is **wrong for stop orders**. If the fallback would fire at the current market price, the API rejects the request with "Order would trigger immediately" — that is the signal you forgot `triggerCondition`. If the token's price cannot be fetched at all, the API refuses to guess and asks for `triggerCondition` outright.
+
+### Percentage Targets
+
+`expectedPrice` also accepts a **signed** percentage offset from the current market price, resolved server-side at creation:
+
+- `"-15%"` → 15% below the current price (also implies `triggerCondition: "BELOW"` if omitted)
+- `"+20%"` → 20% above the current price (also implies `triggerCondition: "ABOVE"` if omitted)
+
+The sign is mandatory — a bare `"15%"` is rejected. Use this for "stop loss at 10% down" or "take profit at 25% up" without looking up the price first. The response order stores the resolved absolute USD price plus `referencePriceUsd` (the market price used).
+
+If you send `triggerCondition` alongside a percentage, it **must match the sign** (`-` → `BELOW`, `+` → `ABOVE`); a mismatch is rejected as a "Conflicting order" because it could only ever fire immediately.
 
 ### Pre-Create Flow (REQUIRED)
 
@@ -542,15 +571,20 @@ curl -s -X POST "${BASE_URL}/api/cap-limit-order" \
     "expectedPrice": "0.0868619",
     "duration": 604800,
     "orderType": "SELL",
+    "triggerCondition": "BELOW",
     "chainId": 8453
   }'
 ```
 
+The example above is a **stop loss**: sell once the price falls to `0.0868619`. Flip `triggerCondition` to `ABOVE` for a take profit.
+
 **Required:** `tokenAddress`, `tokenAmount`, `expectedPrice`, `duration`, `orderType`.
 
-**Optional:** `quoteTokenAddress` (default ETH/native), `chainId` (default `8453`).
+**Optional:** `triggerCondition` (`ABOVE|BELOW` — always send it, see the Strategy Matrix), `quoteTokenAddress` (default ETH/native), `chainId` (default `8453`).
 
 **Response:** `data.id` (new order id).
+
+**On error** "Order would trigger immediately": the target is already on the firing side of the market. Either the user wants a plain swap (§4), or `triggerCondition` was omitted/wrong — re-check the Strategy Matrix and retry.
 
 ---
 
